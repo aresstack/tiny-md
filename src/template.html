@@ -526,7 +526,19 @@ el.btnTheme.addEventListener("click", () => {
       "```",
       "node build.js pfad/zur/datei.md",
       "```",
-    ].join("\n"));
+    ].concat(hasMermaid ? [
+      "",
+      "## Mermaid ist an Bord",
+      "",
+      "Diese Variante rendert ` ```mermaid `-Codeblöcke als Diagramm:",
+      "",
+      "```mermaid",
+      "flowchart LR",
+      "    A[.md öffnen] --> B[marked + DOMPurify]",
+      "    B --> C[Mermaid]",
+      "    C --> D[SVG-Diagramm]",
+      "```",
+    ] : []).join("\n"));
     setMode("read");
   }
 })();
