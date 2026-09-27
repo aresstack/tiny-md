@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      # Baut dist/tiny-md.html + dist/beispiel.html und lässt den Smoke-Test laufen
+      - name: Build & Test
+        run: npm test
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")-${{ github.run_number }}"
+          gh release create "$VERSION" \
+            dist/tiny-md.html \
+            dist/beispiel.html \
+            --target "$GITHUB_SHA" \
+            --title "tiny-md $VERSION" \
+            --notes "Offline-fähiger Markdown-Viewer/-Editor als einzelne HTML-Datei.
+
+          - **tiny-md.html** – leere App: öffnet, rendert, bearbeitet und speichert .md-Dateien
+          - **beispiel.html** – dieselbe App mit eingebettetem Beispieldokument
+
+          Build aus ${{ github.sha }}" \
+            --latest
