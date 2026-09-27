@@ -263,6 +263,30 @@ function renderMarkdown(md) {
   return DOMPurify.sanitize(raw);
 }
 
+// Ein fremdes Dokument darf beim Öffnen nichts nachladen (Tracking-Pixel,
+// Lesebestätigung): automatisch ladende Elemente verlieren Fernressourcen-
+// URLs. data:-URIs, relative Pfade und klickbare Links (<a href>) bleiben.
+DOMPurify.addHook("afterSanitizeAttributes", node => {
+  if (/^(img|image|source|track|video|audio|input|use)$/i.test(node.tagName)) {
+    for (const attr of ["src", "href", "xlink:href", "srcset", "poster"]) {
+      const v = node.getAttribute(attr);
+      if (v && v.includes("//")) node.removeAttribute(attr);
+    }
+  }
+  const style = node.getAttribute("style");
+  if (style && /url\s*\(/i.test(style)) {
+    node.setAttribute("style", style.replace(/url\s*\([^)]*\)/gi, "none"));
+  }
+});
+// Gleiches für CSS in <style>-Elementen (url(), @import)
+DOMPurify.addHook("uponSanitizeElement", (node, data) => {
+  if (data.tagName === "style" && node.textContent && /url\s*\(|@import/i.test(node.textContent)) {
+    node.textContent = node.textContent
+      .replace(/url\s*\([^)]*\)/gi, "none")
+      .replace(/@import[^;]*(;|$)/gi, "");
+  }
+});
+
 /* ---------- Mermaid (optional, nur in der Mermaid-Build-Variante enthalten) ---------- */
 const hasMermaid = typeof mermaid !== "undefined";
 

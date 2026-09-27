@@ -92,5 +92,33 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
   check("leer: Eingabe markiert Dokument als geändert", w.document.title.startsWith("●"));
 }
 
-console.log(failures ? `\n${failures} Fehler` : "\nAlle Prüfungen bestanden");
-process.exit(failures ? 1 : 0);
+/* ---------- Sanitisierung: bösartiges / „nach Hause telefonierendes" Markdown ---------- */
+(async () => {
+  const w = loadApp("tiny-md.html");
+  const editor = w.document.getElementById("editor");
+  editor.value = [
+    '<svg onload="alert(1)" width="10" height="10"><script>alert(2)<' + '/script><rect width="5" height="5" onclick="alert(3)"/></svg>',
+    "",
+    "![tracker](https://example.com/track.png)",
+    "",
+    '<p style="color:red;background:url(https://example.com/x.png)">Absatz</p>',
+    "",
+    '<style>@import "https://example.com/evil.css"; b{background:url(https://example.com/y.png)}</style>',
+    "",
+    "![ok](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=)",
+  ].join("\n");
+  editor.dispatchEvent(new w.Event("input", { bubbles: true }));
+  await new Promise(r => setTimeout(r, 300)); // Debounce der Vorschau abwarten
+
+  const preview = w.document.getElementById("preview");
+  const html = preview.innerHTML;
+  check("sanitize: kein <script> im SVG", preview.querySelector("script") === null);
+  check("sanitize: keine Event-Handler", preview.querySelector("[onload], [onclick]") === null);
+  check("sanitize: SVG selbst bleibt erhalten", preview.querySelector("svg rect") !== null);
+  check("sanitize: Fernbild entfernt", preview.querySelector('img[src*="//"]') === null);
+  check("sanitize: keine Fern-URL im Ergebnis", !html.includes("example.com"));
+  check("sanitize: data-URI-Bild bleibt", preview.querySelector('img[src^="data:image/svg+xml"]') !== null);
+
+  console.log(failures ? `\n${failures} Fehler` : "\nAlle Prüfungen bestanden");
+  process.exit(failures ? 1 : 0);
+})();

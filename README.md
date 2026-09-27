@@ -32,7 +32,8 @@ Datei herunterladen, doppelklicken, fertig.
   - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
   - als Bild mit Data-URI: `![Alt-Text](data:image/svg+xml;base64,…)`
 
-  Beides bleibt selbst-enthalten in der einen HTML-Datei. Klassische relative Bildpfade (`![x](bild.svg)`, auch PNG/JPG) rendern zwar, funktionieren aber nur, solange die Bilddatei neben der HTML liegt – für den E-Mail-Anhang-Fall also Inline-SVG oder Data-URIs verwenden.
+  Beides bleibt selbst-enthalten in der einen HTML-Datei. Klassische relative Bildpfade (`![x](bild.svg)`, auch PNG/JPG) funktionieren nur, solange die Bilddatei neben der HTML liegt – für den E-Mail-Anhang-Fall also Inline-SVG oder Data-URIs verwenden. Bekannte Einschränkung: `<style>`-Blöcke *innerhalb* von Inline-SVGs verträgt das Autolinking nicht zuverlässig – Farben dort besser direkt als Attribute setzen (`fill="…"`).
+- **Kein „nach Hause telefonieren":** automatisch ladende Fernressourcen werden beim Rendern entfernt – Bilder/Video/Audio mit `http(s)`-URLs, `url()` und `@import` in Styles. Ein fremdes Dokument kann beim Öffnen also keine Lesebestätigung per Tracking-Pixel auslösen. Data-URIs und relative Pfade bleiben erlaubt, normale Links bleiben klickbar (öffnen in neuem Tab).
 
 ## Selbst bauen
 
