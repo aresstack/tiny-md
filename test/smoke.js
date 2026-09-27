@@ -52,6 +52,9 @@ function distSize(file) {
   check("beispiel: startet im Lesemodus", w.document.body.classList.contains("mode-read"));
   check("beispiel: Mermaid-Block vorhanden (Diagramm oder Code-Fallback)",
     preview.querySelector(".mermaid-diagram, code.language-mermaid") !== null);
+  check("beispiel: KaTeX-Formeln gerendert", preview.querySelectorAll(".katex").length >= 2);
+  check("beispiel: LaTeX nicht von Markdown zerstört (\\, überlebt)", !preview.textContent.includes("G,x"));
+  check("beispiel: Dollar-Beträge bleiben Text", preview.textContent.includes("$5"));
   check("beispiel: Inline-SVG gerendert", preview.querySelector("svg rect") !== null);
   check("beispiel: Data-URI-SVG-Bild gerendert",
     preview.querySelector('img[src^="data:image/svg+xml"]') !== null);
@@ -118,6 +121,30 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
   check("sanitize: Fernbild entfernt", preview.querySelector('img[src*="//"]') === null);
   check("sanitize: keine Fern-URL im Ergebnis", !html.includes("example.com"));
   check("sanitize: data-URI-Bild bleibt", preview.querySelector('img[src^="data:image/svg+xml"]') !== null);
+
+  /* ---------- Mathe: Roundtrip über den Editor-Eingabepfad ---------- */
+  {
+    const wk = loadApp("tiny-md-katex.html");
+    const ed = wk.document.getElementById("editor");
+    ed.value = "$$G\\,x(t) = G\\,s(t) + G\\,n(t)$$ und inline $\\lambda\\,\\mathrm{m}$";
+    ed.dispatchEvent(new wk.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const pk = wk.document.getElementById("preview");
+    check("katex: Formeln gerendert", pk.querySelectorAll(".katex").length >= 2);
+    check("katex: \\, wird nicht zu Komma zerstört", !pk.textContent.includes("G,x"));
+  }
+  {
+    const ws = loadApp("tiny-md.html");
+    const ed = ws.document.getElementById("editor");
+    ed.value = "Formel $\\lambda\\,x$ Ende";
+    ed.dispatchEvent(new ws.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const ps = ws.document.getElementById("preview");
+    check("schlank: Mathe bleibt wörtlich samt Backslashes erhalten",
+      ps.textContent.includes("$\\lambda\\,x$"));
+  }
+  check("tiny-md-katex.html enthält KaTeX + Fonts", distSize("tiny-md-katex.html") > 500_000);
+  check("tiny-md-full.html enthält Mermaid + KaTeX", distSize("tiny-md-full.html") > 4_000_000);
 
   console.log(failures ? `\n${failures} Fehler` : "\nAlle Prüfungen bestanden");
   process.exit(failures ? 1 : 0);

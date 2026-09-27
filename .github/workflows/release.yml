@@ -32,6 +32,7 @@ jobs:
           gh release create "$VERSION" \
             dist/tiny-md.html \
             dist/tiny-md-mermaid.html \
+            dist/tiny-md-full.html \
             dist/beispiel.html \
             dist/diagramme.html \
             --target "$GITHUB_SHA" \
@@ -40,6 +41,7 @@ jobs:
 
           - **tiny-md.html** – leere App (~90 kB): öffnet, rendert, bearbeitet und speichert .md-Dateien
           - **tiny-md-mermaid.html** – wie oben, zusätzlich mit Mermaid-Diagramm-Rendering (~3,5 MB)
+          - **tiny-md-full.html** – Mermaid und KaTeX-Formel-Rendering (~4,3 MB)
           - **beispiel.html** – App mit eingebettetem Beispieldokument inkl. Mermaid-Diagramm
           - **diagramme.html** – Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph
 

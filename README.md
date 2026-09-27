@@ -12,6 +12,7 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 | ----- | ------ |
 | `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
 | `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
+| `tiny-md-full.html` | Mermaid **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
 | `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 | `diagramme.html` | Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph |
 
@@ -28,6 +29,7 @@ Datei herunterladen, doppelklicken, fertig.
 - Warnung beim Schließen mit ungespeicherten Änderungen
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
 - **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
+- **LaTeX-Formeln** (optional): `$…$` und `$$…$$` werden mit [KaTeX](https://katex.org/) gerendert (Schriften eingebettet, unbekannte Makros erscheinen als roter Fehlertext statt das Dokument zu brechen). Ein eigener Tokenizer schützt Formeln vor der Markdown-Escape-Verarbeitung — `\,`, `\{` & Co. bleiben auch **ohne** KaTeX-Variante unzerstört. Dollar-Beträge (`$5 und $10`) bleiben normaler Text; falls die Heuristik doch anspringt: `\$` schreiben oder `--no-katex` bauen
 - **SVG-Grafiken:** funktionieren auf zwei Wegen direkt im Markdown –
   - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
   - als Bild mit Data-URI: `![Alt-Text](data:image/svg+xml;base64,…)`
@@ -41,10 +43,12 @@ Datei herunterladen, doppelklicken, fertig.
 npm install
 npm run build                    # → dist/tiny-md.html           (leere App)
 node build.js --mermaid          # → dist/tiny-md-mermaid.html   (leere App inkl. Mermaid)
+node build.js --katex            # → dist/tiny-md-katex.html     (leere App inkl. KaTeX)
+node build.js --mermaid --katex  # → dist/tiny-md-full.html      (beides)
 node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
 ```
 
-Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. Enthält das eingebettete Markdown ` ```mermaid `-Blöcke, wird Mermaid **automatisch** mit eingebaut; erzwingen bzw. unterdrücken lässt sich das mit `--mermaid` / `--no-mermaid`. `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
+Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. Enthält das eingebettete Markdown ` ```mermaid `-Blöcke bzw. `$…$`/`$$…$$`-Formeln, werden Mermaid bzw. KaTeX **automatisch** mit eingebaut; erzwingen bzw. unterdrücken lässt sich das mit `--mermaid`/`--no-mermaid` und `--katex`/`--no-katex`. `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
 
 ### Eigenes Dokument als Anhang verschicken
 

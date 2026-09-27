@@ -173,6 +173,7 @@ body.mode-edit .md-body { padding-top: 24px; }
 .md-body hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
 .md-body .mermaid-diagram { margin: 1.2em 0; text-align: center; }
 .md-body .mermaid-diagram svg { max-width: 100%; height: auto; }
+.md-body .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 
 /* ---------- Statusleiste ---------- */
 #statusbar {
@@ -214,6 +215,7 @@ body.dragging #drop-overlay { display: flex; }
   .md-body { max-width: none; padding: 0; }
 }
 </style>
+<style>/*__KATEX_CSS__*/</style>
 </head>
 <body class="mode-read">
 
@@ -251,12 +253,55 @@ body.dragging #drop-overlay { display: flex; }
 <script>/*__MARKED_JS__*/</script>
 <script>/*__PURIFY_JS__*/</script>
 <script>/*__MERMAID_JS__*/</script>
+<script>/*__KATEX_JS__*/</script>
 
 <script>
 "use strict";
 
 /* ---------- Renderer ---------- */
 marked.setOptions({ gfm: true, breaks: false });
+
+/* ---------- Mathe: $…$ / $$…$$ (KaTeX nur in den KaTeX-Build-Varianten) ----------
+   Der Tokenizer greift Formeln VOR der CommonMark-Escape-Verarbeitung ab,
+   sonst zerstört marked LaTeX-Sequenzen wie \, oder \{ . Ohne KaTeX wird
+   der Originaltext unverändert (escaped) angezeigt. */
+const hasKatex = typeof katex !== "undefined";
+
+function renderMath(tex, displayMode, raw) {
+  if (!hasKatex) {
+    return displayMode
+      ? '<pre class="math-src">' + escapeHtml(raw) + "</pre>"
+      : '<span class="math-src">' + escapeHtml(raw) + "</span>";
+  }
+  return katex.renderToString(tex, { displayMode, throwOnError: false });
+}
+
+marked.use({
+  extensions: [
+    {
+      name: "mathBlock",
+      level: "block",
+      start: src => src.indexOf("$$"),
+      tokenizer(src) {
+        const m = /^\$\$([\s\S]+?)\$\$/.exec(src);
+        if (m) return { type: "mathBlock", raw: m[0], text: m[1].trim() };
+      },
+      renderer(tok) { return renderMath(tok.text, true, tok.raw); },
+    },
+    {
+      name: "mathInline",
+      level: "inline",
+      start: src => src.indexOf("$"),
+      tokenizer(src) {
+        // Kein Leerzeichen nach öffnendem/vor schließendem $, keine Ziffer
+        // danach – damit Dollar-Beträge ("$5 und $10") kein Mathe werden.
+        const m = /^\$(?!\s)((?:\\.|[^\n$])+?)(?<!\s)\$(?!\d)/.exec(src);
+        if (m) return { type: "mathInline", raw: m[0], text: m[1] };
+      },
+      renderer(tok) { return renderMath(tok.text, false, tok.raw); },
+    },
+  ],
+});
 
 function renderMarkdown(md) {
   const raw = marked.parse(md);
@@ -562,6 +607,13 @@ el.btnTheme.addEventListener("click", () => {
       "    B --> C[Mermaid]",
       "    C --> D[SVG-Diagramm]",
       "```",
+    ] : []).concat(hasKatex ? [
+      "",
+      "## KaTeX ist an Bord",
+      "",
+      "Diese Variante rendert Formeln in `$…$` und `$$…$$`, zum Beispiel $\\Delta\\theta \\approx \\lambda / D$ oder",
+      "",
+      "$$D \\approx \\frac{\\lambda}{\\Delta\\theta} = \\frac{0{,}343\\,\\mathrm{m}}{0{,}175} \\approx 2{,}0\\,\\mathrm{m}.$$",
     ] : []).join("\n"));
     setMode("read");
   }

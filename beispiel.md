@@ -26,6 +26,14 @@ Dieses Dokument testet das Rendering von **tiny-md** – Umlaute (ä, ö, ü, ß
 | Firefox | ✔      | ✖ (Download)     |
 | Edge    | ✔      | ✔                |
 
+## Mathe (KaTeX)
+
+Inline wie $\Delta\theta \approx \lambda / D$ und als Block – bewusst mit `\,` und `\frac`, die ohne Mathe-Tokenizer von Markdown zerstört würden:
+
+$$G\,x(t) = G\,s(t) + G\,n(t), \qquad \frac{G^2\,\sigma_s^2}{G^2\,\sigma_n^2} = \frac{\sigma_s^2}{\sigma_n^2}$$
+
+Dollar-Beträge wie $5 oder $10 bleiben dagegen normaler Text.
+
 ## SVG
 
 Inline-SVG direkt im Markdown:
