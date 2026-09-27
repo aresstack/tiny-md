@@ -52,6 +52,9 @@ function distSize(file) {
   check("beispiel: startet im Lesemodus", w.document.body.classList.contains("mode-read"));
   check("beispiel: Mermaid-Block vorhanden (Diagramm oder Code-Fallback)",
     preview.querySelector(".mermaid-diagram, code.language-mermaid") !== null);
+  check("beispiel: Inline-SVG gerendert", preview.querySelector("svg rect") !== null);
+  check("beispiel: Data-URI-SVG-Bild gerendert",
+    preview.querySelector('img[src^="data:image/svg+xml"]') !== null);
   check("beispiel: Mermaid automatisch eingebettet (Dateigröße)", distSize("beispiel.html") > 2_000_000);
 }
 

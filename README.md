@@ -28,6 +28,11 @@ Datei herunterladen, doppelklicken, fertig.
 - Warnung beim Schließen mit ungespeicherten Änderungen
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
 - **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
+- **SVG-Grafiken:** funktionieren auf zwei Wegen direkt im Markdown –
+  - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
+  - als Bild mit Data-URI: `![Alt-Text](data:image/svg+xml;base64,…)`
+
+  Beides bleibt selbst-enthalten in der einen HTML-Datei. Klassische relative Bildpfade (`![x](bild.svg)`, auch PNG/JPG) rendern zwar, funktionieren aber nur, solange die Bilddatei neben der HTML liegt – für den E-Mail-Anhang-Fall also Inline-SVG oder Data-URIs verwenden.
 
 ## Selbst bauen
 

@@ -26,6 +26,18 @@ Dieses Dokument testet das Rendering von **tiny-md** – Umlaute (ä, ö, ü, ß
 | Firefox | ✔      | ✖ (Download)     |
 | Edge    | ✔      | ✔                |
 
+## SVG
+
+Inline-SVG direkt im Markdown:
+
+<svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Drei bunte Formen">
+  <rect x="8" y="10" width="40" height="40" rx="8" fill="#4c78a8"/>
+  <circle cx="90" cy="30" r="21" fill="#f58518"/>
+  <polygon points="140,50 160,10 178,50" fill="#54a24b"/>
+</svg>
+
+Und als Data-URI-Bild: ![grüner Kreis](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjUiIGZpbGw9IiM1NGEyNGIiLz48L3N2Zz4=)
+
 ## Diagramm (Mermaid)
 
 ```mermaid
