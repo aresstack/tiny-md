@@ -61,3 +61,7 @@ npm test
 ```
 
 Baut beide Varianten und prüft sie in jsdom: Rendering (Überschriften, Tabellen, Code, Task-Listen, Umlaute), XSS-Bereinigung, Dateiname, Editor-Roundtrip.
+
+---
+
+<sub>© 2026 [AresStack](https://github.com/aresstack)</sub>

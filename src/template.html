@@ -184,6 +184,8 @@ body.mode-edit .md-body { padding-top: 24px; }
   background: var(--bg-soft);
 }
 #statusbar .spacer { flex: 1; }
+#copyright { color: var(--fg-muted); text-decoration: none; opacity: 0.75; }
+#copyright:hover { color: var(--accent); opacity: 1; }
 
 /* ---------- Drag & Drop ---------- */
 #drop-overlay {
@@ -235,6 +237,7 @@ body.dragging #drop-overlay { display: flex; }
   <span id="status-mode"></span>
   <span class="spacer"></span>
   <span id="status-count"></span>
+  <a id="copyright" href="https://github.com/aresstack" target="_blank" rel="noopener">© 2026 AresStack</a>
 </footer>
 
 <div id="drop-overlay">Markdown-Datei hier ablegen</div>
