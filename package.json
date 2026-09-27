@@ -1,0 +1,18 @@
+{
+  "name": "tiny-md",
+  "version": "1.0.0",
+  "description": "Markdown-Viewer/-Editor als einzelne offline-fähige HTML-Datei (E-Mail-Anhang-tauglich)",
+  "scripts": {
+    "build": "node build.js",
+    "embed": "node build.js",
+    "test": "node build.js && node build.js beispiel.md && node test/smoke.js"
+  },
+  "private": true,
+  "dependencies": {
+    "dompurify": "^3.4.16",
+    "marked": "^18.0.14"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}
