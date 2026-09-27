@@ -8,6 +8,9 @@
  *
  * Enthält das eingebettete Markdown ```mermaid-Blöcke, wird Mermaid
  * automatisch mit eingebaut (abschaltbar mit --no-mermaid).
+ *
+ * --out=pfad/datei.html schreibt das Ergebnis an einen beliebigen Ort
+ * (für Pipelines, die tiny-md nur als Werkzeug auschecken).
  */
 "use strict";
 
@@ -45,6 +48,7 @@ if (mdArg) {
 const withMermaid = flags.has("--mermaid") ||
   (!flags.has("--no-mermaid") && /^\s*(`{3,}|~{3,})\s*mermaid\b/m.test(embeddedMd));
 
+const outArg = args.find(a => a.startsWith("--out="));
 const outName = mdArg
   ? path.basename(mdArg, path.extname(mdArg)) + ".html"
   : (withMermaid ? "tiny-md-mermaid.html" : "tiny-md.html");
@@ -58,9 +62,8 @@ html = inject(html, "/*__MERMAID_JS__*/", withMermaid
 html = inject(html, "__EMBEDDED_FILENAME__", embeddedName.replace(/"/g, "&quot;"));
 html = inject(html, "__EMBEDDED_MD__", escapeScriptEnd(embeddedMd));
 
-const outDir = path.join(ROOT, "dist");
-fs.mkdirSync(outDir, { recursive: true });
-const outPath = path.join(outDir, outName);
+const outPath = outArg ? path.resolve(outArg.slice("--out=".length)) : path.join(ROOT, "dist", outName);
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, html);
 
 const kb = (fs.statSync(outPath).size / 1024).toFixed(0);

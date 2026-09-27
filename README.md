@@ -48,6 +48,36 @@ node build.js bericht.md
 
 → `dist/bericht.html` enthält App **und** Dokument und kann direkt als E-Mail-Anhang verschickt werden. Die Empfängerseite braucht nur einen Browser.
 
+## In einer Pipeline verwenden (Dokumente statt PDF ausliefern)
+
+Der typische Ablauf „Markdown schreiben → am Ende PDF erzeugen" lässt sich ersetzen durch: **Markdown in tiny-md einbetten und die HTML ausliefern**. Der Empfänger braucht nur einen Browser, bekommt aber ein durchsuchbares, druckbares Dokument mit Hell/Dunkel-Modus und ggf. Mermaid-Diagrammen — und kann es bei Bedarf sogar weiterbearbeiten. (PDF geht zur Not immer noch: Drucken → „Als PDF speichern", die Toolbar wird dabei automatisch ausgeblendet.)
+
+tiny-md wird dazu einfach als Werkzeug mit ausgecheckt; `--out=` legt das Ergebnis an einen beliebigen Ort:
+
+```yaml
+# .github/workflows/docs.yml im eigenen Dokumentations-Repo
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: aresstack/tiny-md
+          path: .tiny-md
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix .tiny-md
+      - run: node .tiny-md/build.js docs/handbuch.md --out=out/handbuch.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: handbuch
+          path: out/handbuch.html
+```
+
+Statt des Artifacts kann der letzte Schritt die HTML natürlich auch an ein Release hängen (`gh release upload`), auf GitHub Pages veröffentlichen oder per Mail verschicken. Mehrere Dokumente: einfach `build.js` pro `.md`-Datei aufrufen — enthält ein Dokument Mermaid-Blöcke, wird die Diagramm-Library automatisch mit eingebettet, sonst bleibt die Datei bei ~90 kB.
+
 ## Projektstruktur
 
 ```
