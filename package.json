@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.js",
     "embed": "node build.js",
-    "test": "node build.js && node build.js --mermaid && node build.js beispiel.md && node test/smoke.js"
+    "test": "node build.js && node build.js --mermaid && node build.js beispiel.md && node build.js diagramme.md && node test/smoke.js"
   },
   "private": true,
   "dependencies": {

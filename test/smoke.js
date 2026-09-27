@@ -55,6 +55,17 @@ function distSize(file) {
   check("beispiel: Mermaid automatisch eingebettet (Dateigröße)", distSize("beispiel.html") > 2_000_000);
 }
 
+/* ---------- dist/diagramme.html (Mermaid-Schaufenster) ---------- */
+{
+  const w = loadApp("diagramme.html");
+  const preview = w.document.getElementById("preview");
+  check("diagramme: H1 gerendert", /Mermaid-Schaufenster/.test(preview.innerHTML));
+  // In jsdom bleiben die Blöcke als Code-Fallback stehen; im Browser werden sie zu SVG
+  check("diagramme: alle 8 Mermaid-Blöcke vorhanden",
+    preview.querySelectorAll(".mermaid-diagram, code.language-mermaid").length === 8);
+  check("diagramme: Mermaid eingebettet (Dateigröße)", distSize("diagramme.html") > 2_000_000);
+}
+
 /* ---------- Build-Varianten: Mermaid nur wo bestellt ---------- */
 check("tiny-md.html bleibt schlank (ohne Mermaid)", distSize("tiny-md.html") < 500_000);
 check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") > 2_000_000);
