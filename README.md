@@ -65,6 +65,10 @@ npm test
 
 Baut beide Varianten und prüft sie in jsdom: Rendering (Überschriften, Tabellen, Code, Task-Listen, Umlaute), XSS-Bereinigung, Dateiname, Editor-Roundtrip.
 
+## Lizenz
+
+[MIT](LICENSE). Die eingebetteten Bibliotheken (marked: MIT, DOMPurify: Apache-2.0/MPL-2.0 dual, Mermaid: MIT) sind MIT-kompatibel; Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md). Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten.
+
 ---
 
 <sub>© 2026 [AresStack](https://github.com/aresstack)</sub>
