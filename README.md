@@ -10,8 +10,9 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 
 | Datei | Inhalt |
 | ----- | ------ |
-| `tiny-md.html` | die leere App: öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
-| `beispiel.html` | dieselbe App mit fest eingebettetem Beispieldokument |
+| `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
+| `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
+| `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 
 Datei herunterladen, doppelklicken, fertig.
 
@@ -25,16 +26,18 @@ Datei herunterladen, doppelklicken, fertig.
   - Firefox: als Download
 - Warnung beim Schließen mit ungespeicherten Änderungen
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
+- **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
 
 ## Selbst bauen
 
 ```
 npm install
-npm run build                    # → dist/tiny-md.html   (leere App)
-node build.js pfad/zu/datei.md   # → dist/datei.html     (Markdown fest eingebettet)
+npm run build                    # → dist/tiny-md.html           (leere App)
+node build.js --mermaid          # → dist/tiny-md-mermaid.html   (leere App inkl. Mermaid)
+node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
 ```
 
-Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
+Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. Enthält das eingebettete Markdown ` ```mermaid `-Blöcke, wird Mermaid **automatisch** mit eingebaut; erzwingen bzw. unterdrücken lässt sich das mit `--mermaid` / `--no-mermaid`. `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
 
 ### Eigenes Dokument als Anhang verschicken
 

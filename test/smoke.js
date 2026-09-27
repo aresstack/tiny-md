@@ -25,11 +25,17 @@ function loadApp(file) {
   });
   // jsdom kennt matchMedia nicht – minimaler Polyfill vor App-Start
   dom.window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
-  // Skripte der Seite in Dokumentreihenfolge ausführen
+  // Skripte der Seite in Dokumentreihenfolge ausführen. Einzeln abgesichert:
+  // das Mermaid-Bundle braucht Browser-APIs, die jsdom teils fehlen – die App
+  // selbst muss auch dann noch starten (hasMermaid-Fallback).
   for (const s of dom.window.document.querySelectorAll("script:not([type])")) {
-    dom.window.eval(s.textContent);
+    try { dom.window.eval(s.textContent); } catch (_) {}
   }
   return dom.window;
+}
+
+function distSize(file) {
+  return fs.statSync(path.join(__dirname, "..", "dist", file)).size;
 }
 
 /* ---------- dist/beispiel.html (eingebettetes Dokument) ---------- */
@@ -44,6 +50,18 @@ function loadApp(file) {
   check("beispiel: Dateiname angezeigt", w.document.getElementById("file-label").textContent.includes("beispiel.md"));
   check("beispiel: Umlaute intakt", preview.innerHTML.includes("Umlaute (ä, ö, ü, ß)"));
   check("beispiel: startet im Lesemodus", w.document.body.classList.contains("mode-read"));
+  check("beispiel: Mermaid-Block vorhanden (Diagramm oder Code-Fallback)",
+    preview.querySelector(".mermaid-diagram, code.language-mermaid") !== null);
+  check("beispiel: Mermaid automatisch eingebettet (Dateigröße)", distSize("beispiel.html") > 2_000_000);
+}
+
+/* ---------- Build-Varianten: Mermaid nur wo bestellt ---------- */
+check("tiny-md.html bleibt schlank (ohne Mermaid)", distSize("tiny-md.html") < 500_000);
+check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") > 2_000_000);
+{
+  const w = loadApp("tiny-md-mermaid.html");
+  const preview = w.document.getElementById("preview");
+  check("mermaid-variante: App startet", /<h1[^>]*>tiny-md<\/h1>/.test(preview.innerHTML));
 }
 
 /* ---------- dist/tiny-md.html (leere App) ---------- */

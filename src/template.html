@@ -171,6 +171,8 @@ body.mode-edit .md-body { padding-top: 24px; }
 .md-body tr:nth-child(2n) td { background: var(--bg-soft); }
 .md-body img { max-width: 100%; border-radius: 6px; }
 .md-body hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+.md-body .mermaid-diagram { margin: 1.2em 0; text-align: center; }
+.md-body .mermaid-diagram svg { max-width: 100%; height: auto; }
 
 /* ---------- Statusleiste ---------- */
 #statusbar {
@@ -248,6 +250,7 @@ body.dragging #drop-overlay { display: flex; }
 
 <script>/*__MARKED_JS__*/</script>
 <script>/*__PURIFY_JS__*/</script>
+<script>/*__MERMAID_JS__*/</script>
 
 <script>
 "use strict";
@@ -258,6 +261,37 @@ marked.setOptions({ gfm: true, breaks: false });
 function renderMarkdown(md) {
   const raw = marked.parse(md);
   return DOMPurify.sanitize(raw);
+}
+
+/* ---------- Mermaid (optional, nur in der Mermaid-Build-Variante enthalten) ---------- */
+const hasMermaid = typeof mermaid !== "undefined";
+
+function initMermaid() {
+  if (!hasMermaid) return;
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
+  });
+}
+
+let mermaidSeq = 0;
+let mermaidRun = 0;
+async function renderMermaidIn(container) {
+  if (!hasMermaid) return;
+  const run = ++mermaidRun;
+  for (const code of container.querySelectorAll("pre > code.language-mermaid")) {
+    try {
+      const { svg } = await mermaid.render("mmd-" + (++mermaidSeq), code.textContent);
+      if (run !== mermaidRun) return; // Vorschau wurde inzwischen neu aufgebaut
+      const div = document.createElement("div");
+      div.className = "mermaid-diagram";
+      div.innerHTML = svg;
+      code.parentElement.replaceWith(div);
+    } catch (_) {
+      // Ungültiges Diagramm (z. B. während des Tippens) → Codeblock stehen lassen
+    }
+  }
 }
 
 /* ---------- State ---------- */
@@ -291,6 +325,7 @@ function updatePreview() {
     a.target = "_blank";
     a.rel = "noopener noreferrer";
   });
+  renderMermaidIn(el.preview);
 }
 
 function updateChrome() {
@@ -452,6 +487,7 @@ window.addEventListener("beforeunload", e => {
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem("tiny-md-theme", theme); } catch (_) {}
+  if (hasMermaid) { initMermaid(); updatePreview(); }
 }
 el.btnTheme.addEventListener("click", () => {
   applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
@@ -465,6 +501,7 @@ el.btnTheme.addEventListener("click", () => {
 
 /* ---------- Start ---------- */
 (function init() {
+  initMermaid();
   const embed = document.getElementById("embedded-md");
   // Beim Einbetten wurde "</script" escaped – hier rückgängig machen
   const embeddedText = embed.textContent.replace(/<\\\/script/gi, "\x3C/script").trim();

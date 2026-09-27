@@ -26,6 +26,17 @@ Dieses Dokument testet das Rendering von **tiny-md** – Umlaute (ä, ö, ü, ß
 | Firefox | ✔      | ✖ (Download)     |
 | Edge    | ✔      | ✔                |
 
+## Diagramm (Mermaid)
+
+```mermaid
+flowchart LR
+    A[Markdown] --> B[marked]
+    B --> C[DOMPurify]
+    C --> D[Vorschau]
+    D --> E{Mermaid-Block?}
+    E -- ja --> F[SVG-Diagramm]
+```
+
 ## Code
 
 ```js

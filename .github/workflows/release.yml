@@ -20,7 +20,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Baut dist/tiny-md.html + dist/beispiel.html und lässt den Smoke-Test laufen
+      # Baut alle Varianten und lässt den Smoke-Test laufen
       - name: Build & Test
         run: npm test
 
@@ -31,13 +31,15 @@ jobs:
           VERSION="v$(node -p "require('./package.json').version")-${{ github.run_number }}"
           gh release create "$VERSION" \
             dist/tiny-md.html \
+            dist/tiny-md-mermaid.html \
             dist/beispiel.html \
             --target "$GITHUB_SHA" \
             --title "tiny-md $VERSION" \
             --notes "Offline-fähiger Markdown-Viewer/-Editor als einzelne HTML-Datei.
 
-          - **tiny-md.html** – leere App: öffnet, rendert, bearbeitet und speichert .md-Dateien
-          - **beispiel.html** – dieselbe App mit eingebettetem Beispieldokument
+          - **tiny-md.html** – leere App (~90 kB): öffnet, rendert, bearbeitet und speichert .md-Dateien
+          - **tiny-md-mermaid.html** – wie oben, zusätzlich mit Mermaid-Diagramm-Rendering (~3,5 MB)
+          - **beispiel.html** – App mit eingebettetem Beispieldokument inkl. Mermaid-Diagramm
 
           Build aus ${{ github.sha }}" \
             --latest
