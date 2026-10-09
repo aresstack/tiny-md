@@ -81,4 +81,5 @@ jobs:
 
           **Lizenz – bitte beachten:** Diese Dateien enthalten [Swagger UI](https://github.com/swagger-api/swagger-ui) (© SmartBear Software Inc.) unter der **Apache License 2.0**. Die MIT-Lizenz von tiny-md gilt nur für den tiny-md-Code, nicht für SwaggerUI. Bei Weitergabe gelten für SwaggerUI die Bedingungen der Apache-2.0 (Lizenztext und NOTICE beilegen bzw. erhalten). Lizenztext, NOTICE und die Lizenz-Header der gebündelten Abhängigkeiten sind in den HTML-Dateien eingebettet und liegen zusätzlich als Dateien bei.
 
-          Build aus ${{ github.sha }}"
+          Build aus ${{ github.sha }}" \
+            --latest=false
