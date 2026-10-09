@@ -16,8 +16,29 @@
   --code-bg: #f0f2f5;
   --blockquote: #59636e;
   --shadow: rgba(0, 0, 0, 0.08);
+  /* Syntax-Highlighting (Prism-Tokens) */
+  --tok-comment: #6e7781;
+  --tok-keyword: #cf222e;
+  --tok-string: #0a3069;
+  --tok-number: #0550ae;
+  --tok-function: #8250df;
+  --tok-type: #953800;
+  --tok-tag: #116329;
+  --tok-attr: #0550ae;
+  --tok-deleted: #82071e;
+  --tok-inserted: #116329;
 }
 html[data-theme="dark"] {
+  --tok-comment: #8b949e;
+  --tok-keyword: #ff7b72;
+  --tok-string: #a5d6ff;
+  --tok-number: #79c0ff;
+  --tok-function: #d2a8ff;
+  --tok-type: #ffa657;
+  --tok-tag: #7ee787;
+  --tok-attr: #79c0ff;
+  --tok-deleted: #ffa198;
+  --tok-inserted: #7ee787;
   --bg: #14181d;
   --bg-soft: #1c2128;
   --fg: #d6dde4;
@@ -122,6 +143,20 @@ body.mode-edit .md-body { padding-top: 24px; }
   margin: 1em 0;
 }
 .md-body pre code { background: none; padding: 0; font-size: 0.82em; }
+/* Syntax-Highlighting (nur in Varianten mit Prism; Farben folgen dem Hell/Dunkel-Theme) */
+.md-body .token.comment, .md-body .token.prolog, .md-body .token.doctype, .md-body .token.cdata { color: var(--tok-comment); font-style: italic; }
+.md-body .token.punctuation { color: var(--fg-muted); }
+.md-body .token.keyword, .md-body .token.atrule, .md-body .token.important, .md-body .token.rule { color: var(--tok-keyword); }
+.md-body .token.string, .md-body .token.char, .md-body .token.attr-value, .md-body .token.regex, .md-body .token.url { color: var(--tok-string); }
+.md-body .token.number, .md-body .token.boolean, .md-body .token.constant, .md-body .token.symbol, .md-body .token.null { color: var(--tok-number); }
+.md-body .token.function, .md-body .token.selector, .md-body .token.annotation, .md-body .token.decorator { color: var(--tok-function); }
+.md-body .token.class-name, .md-body .token.builtin, .md-body .token.variable, .md-body .token.namespace { color: var(--tok-type); }
+.md-body .token.tag, .md-body .token.property, .md-body .token.key { color: var(--tok-tag); }
+.md-body .token.attr-name, .md-body .token.operator, .md-body .token.entity { color: var(--tok-attr); }
+.md-body .token.deleted { color: var(--tok-deleted); }
+.md-body .token.inserted { color: var(--tok-inserted); }
+.md-body .token.bold, .md-body .token.important { font-weight: 600; }
+.md-body .token.italic { font-style: italic; }
 .md-body table {
   border-collapse: collapse;
   margin: 1.1em 0;
@@ -273,6 +308,7 @@ body.dragging #drop-overlay { display: flex; }
 <script>/*__MERMAID_JS__*/</script>
 <script>/*__KATEX_JS__*/</script>
 <script>/*__SWAGGER_JS__*/</script>
+<script>/*__PRISM_JS__*/</script>
 
 <script>
 "use strict";
@@ -382,6 +418,19 @@ async function renderMermaidIn(container) {
   }
 }
 
+/* ---------- Syntax-Highlighting (optional, nur in Varianten mit Prism) ----------
+   Prism tokenisiert den (bereits sanitisierten) Textinhalt neu und erzeugt nur
+   <span class="token …">-Elemente – es kommt kein Fremd-HTML hinein. */
+const hasPrism = typeof Prism !== "undefined" && typeof Prism.highlightElement === "function";
+
+function highlightIn(container) {
+  if (!hasPrism) return;
+  for (const code of container.querySelectorAll('pre > code[class*="language-"]')) {
+    if (code.classList.contains("language-mermaid")) continue;
+    try { Prism.highlightElement(code); } catch (_) { /* unbekannte Sprache → bleibt schlicht */ }
+  }
+}
+
 /* ---------- OpenAPI (optional, nur in der Swagger-Build-Variante enthalten) ----------
    .yaml/.yml/.json-Dateien mit openapi:/swagger:-Versionsangabe werden mit
    SwaggerUI angezeigt; ohne SwaggerUI (oder bei anderem YAML/JSON) als Codeblock. */
@@ -453,6 +502,7 @@ function updatePreview() {
     a.target = "_blank";
     a.rel = "noopener noreferrer";
   });
+  highlightIn(el.preview);
   renderMermaidIn(el.preview);
 }
 
@@ -685,6 +735,15 @@ el.btnTheme.addEventListener("click", () => {
       "Diese Variante rendert Formeln in `$…$` und `$$…$$`, zum Beispiel $\\Delta\\theta \\approx \\lambda / D$ oder",
       "",
       "$$D \\approx \\frac{\\lambda}{\\Delta\\theta} = \\frac{0{,}343\\,\\mathrm{m}}{0{,}175} \\approx 2{,}0\\,\\mathrm{m}.$$",
+    ] : []).concat(hasPrism ? [
+      "",
+      "## Syntax-Highlighting ist an Bord",
+      "",
+      "Codeblöcke mit Sprachangabe (` ```json `, ` ```java `, ` ```bash ` …) werden farbig hervorgehoben:",
+      "",
+      "```json",
+      '{ "name": "tiny-md", "offline": true, "plugins": ["mermaid", "katex"] }',
+      "```",
     ] : []).concat(hasSwagger ? [
       "",
       "## SwaggerUI ist an Bord",

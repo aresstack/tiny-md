@@ -5,6 +5,7 @@
  *   node build.js                 → dist/tiny-md.html          (leere App)
  *   node build.js --mermaid       → dist/tiny-md-mermaid.html  (leere App inkl. Mermaid)
  *   node build.js --swagger       → dist/tiny-md-swagger.html  (leere App inkl. SwaggerUI)
+ *   node build.js --highlight     → dist/tiny-md-highlight.html (leere App inkl. Syntax-Highlighting)
  *   node build.js --bundle=mit    → dist/tiny-md-full-mit.html    (alle MIT-lizenzierten Plugins)
  *   node build.js --bundle=apache → dist/tiny-md-full-apache.html (zusätzlich alle Apache-2.0-Plugins)
  *   node build.js pfad/notes.md   → dist/notes.html            (Markdown fest eingebettet)
@@ -16,6 +17,8 @@
  * Flags zusammen ergeben bei leerer App tiny-md-full.html).
  * Eine eingebettete .yaml/.yml/.json-Datei mit openapi:/swagger:-Version
  * bringt automatisch SwaggerUI mit (--no-swagger / --swagger analog).
+ * Codeblöcke mit Sprachangabe (```js …) bringen Prism fürs Syntax-Highlighting
+ * mit (--highlight / --no-highlight).
  *
  * --out=pfad/datei.html schreibt das Ergebnis an einen beliebigen Ort
  * (für Pipelines, die tiny-md nur als Werkzeug auschecken).
@@ -64,6 +67,10 @@ const PLUGINS = {
   katex: { license: "MIT", auto: () => !isSpecFile &&
     (/\$\$[\s\S]+?\$\$/.test(embeddedMd) || /(^|[^\\$])\$\S[^$\n]*\$/m.test(embeddedMd)) },
   swagger: { license: "Apache-2.0", auto: () => isOpenApi },
+  // Syntax-Highlighting (Prism): sobald ein Codeblock eine Sprache angibt bzw.
+  // YAML/JSON ohne SwaggerUI als Codeblock angezeigt wird (nach swagger auswerten)
+  highlight: { license: "MIT", auto: () => isSpecFile ? !withSwagger
+    : /^\s*(`{3,}|~{3,})[ \t]*(?!mermaid\b)[\w#+-]/m.test(embeddedMd) },
 };
 
 // Lizenz-Bundles: welche Plugin-Lizenzen sie enthalten (apache ⊃ mit)
@@ -86,6 +93,21 @@ const enabled = name => {
 const withMermaid = enabled("mermaid");
 const withKatex = enabled("katex");
 const withSwagger = enabled("swagger");
+const withHighlight = enabled("highlight");
+
+// Prism: Kern plus gängige Sprachen, Reihenfolge nach Prisms eigener Abhängigkeitsliste
+const PRISM_LANGS = ["markup", "css", "clike", "javascript", "typescript", "jsx", "tsx", "json", "yaml",
+  "toml", "ini", "properties", "bash", "powershell", "batch", "python", "java", "kotlin", "groovy", "scala",
+  "c", "cpp", "csharp", "go", "rust", "php", "ruby", "perl", "lua", "r", "swift", "dart", "sql", "graphql",
+  "diff", "markdown", "docker", "makefile", "nginx", "http", "regex"];
+function prismJs() {
+  const dir = path.join(ROOT, "node_modules", "prismjs");
+  const ids = require(path.join(dir, "dependencies.js"))(require(path.join(dir, "components.json")), PRISM_LANGS).getIds();
+  // Kopf mit Lizenzhinweis; manual: kein automatisches highlightAll beim Laden
+  return "/*! Prism.js | MIT License | (c) Lea Verou and contributors | https://prismjs.com */\n"
+    + "window.Prism = { manual: true };\n"
+    + ["core", ...ids].map(id => read(path.join(dir, "components", `prism-${id}.min.js`))).join("\n");
+}
 
 // KaTeX-CSS: pro @font-face nur den woff2-Eintrag behalten, Font als data:-URI einbetten
 function katexCss() {
@@ -118,7 +140,7 @@ const outName = mdArg
   : (withMermaid && withKatex ? "tiny-md-full"
     : withMermaid ? "tiny-md-mermaid"
     : withKatex ? "tiny-md-katex"
-    : "tiny-md") + (withSwagger ? "-swagger" : "") + ".html";
+    : "tiny-md") + (withHighlight ? "-highlight" : "") + (withSwagger ? "-swagger" : "") + ".html";
 
 let html = read(path.join(ROOT, "src", "template.html"));
 html = inject(html, "/*__MARKED_JS__*/", escapeScriptEnd(read(path.join(ROOT, "node_modules", "marked", "lib", "marked.umd.js"))));
@@ -134,6 +156,7 @@ html = inject(html, "/*__SWAGGER_JS__*/", withSwagger ? escapeScriptEnd(swaggerJ
 html = inject(html, "/*__SWAGGER_CSS__*/", withSwagger
   ? stripSourceMap(read(path.join(swaggerDist, "swagger-ui.css"))).replace(/<\/style/gi, "<\\/style")
   : "");
+html = inject(html, "/*__PRISM_JS__*/", withHighlight ? escapeScriptEnd(prismJs()) : "");
 html = inject(html, "__EMBEDDED_FILENAME__", embeddedName.replace(/"/g, "&quot;"));
 html = inject(html, "__EMBEDDED_MD__", escapeScriptEnd(embeddedMd));
 
@@ -146,4 +169,5 @@ console.log(`✔ ${path.relative(ROOT, outPath)} (${kb} kB)`
   + (embeddedName ? ` – eingebettet: ${embeddedName}` : "")
   + (withMermaid ? " + Mermaid" : "")
   + (withKatex ? " + KaTeX" : "")
+  + (withHighlight ? " + Prism" : "")
   + (withSwagger ? " + SwaggerUI" : ""));
