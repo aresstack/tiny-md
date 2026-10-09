@@ -5,6 +5,8 @@
  *   node build.js                 → dist/tiny-md.html          (leere App)
  *   node build.js --mermaid       → dist/tiny-md-mermaid.html  (leere App inkl. Mermaid)
  *   node build.js --swagger       → dist/tiny-md-swagger.html  (leere App inkl. SwaggerUI)
+ *   node build.js --bundle=mit    → dist/tiny-md-full-mit.html    (alle MIT-lizenzierten Plugins)
+ *   node build.js --bundle=apache → dist/tiny-md-full-apache.html (zusätzlich alle Apache-2.0-Plugins)
  *   node build.js pfad/notes.md   → dist/notes.html            (Markdown fest eingebettet)
  *   node build.js pfad/api.yaml   → dist/api.html              (OpenAPI-Spezifikation fest eingebettet)
  *
@@ -55,13 +57,35 @@ const isSpecFile = /\.(ya?ml|json)$/i.test(embeddedName);
 const isOpenApi = isSpecFile &&
   /(^|[{,]\s*)["']?(openapi|swagger)["']?\s*:\s*["']?\d/m.test(embeddedMd);
 
-// Mermaid/KaTeX/SwaggerUI: per Flag erzwingen/unterdrücken, sonst automatisch anhand des Inhalts
-const withMermaid = flags.has("--mermaid") ||
-  (!flags.has("--no-mermaid") && !isSpecFile && /^\s*(`{3,}|~{3,})\s*mermaid\b/m.test(embeddedMd));
-const withSwagger = flags.has("--swagger") || (!flags.has("--no-swagger") && isOpenApi);
-const withKatex = flags.has("--katex") ||
-  (!flags.has("--no-katex") && !isSpecFile &&
-    (/\$\$[\s\S]+?\$\$/.test(embeddedMd) || /(^|[^\\$])\$\S[^$\n]*\$/m.test(embeddedMd)));
+// Plugins mit ihrer Lizenz. Neue Plugins hier eintragen: die Lizenz entscheidet,
+// in welchem Bundle (--bundle=mit / --bundle=apache) sie automatisch landen.
+const PLUGINS = {
+  mermaid: { license: "MIT", auto: () => !isSpecFile && /^\s*(`{3,}|~{3,})\s*mermaid\b/m.test(embeddedMd) },
+  katex: { license: "MIT", auto: () => !isSpecFile &&
+    (/\$\$[\s\S]+?\$\$/.test(embeddedMd) || /(^|[^\\$])\$\S[^$\n]*\$/m.test(embeddedMd)) },
+  swagger: { license: "Apache-2.0", auto: () => isOpenApi },
+};
+
+// Lizenz-Bundles: welche Plugin-Lizenzen sie enthalten (apache ⊃ mit)
+const BUNDLES = {
+  mit: ["MIT"],
+  apache: ["MIT", "Apache-2.0"],
+};
+const bundleArg = args.find(a => a.startsWith("--bundle="));
+const bundle = bundleArg && bundleArg.slice("--bundle=".length);
+if (bundle && !BUNDLES[bundle]) {
+  throw new Error(`Unbekanntes Bundle: ${bundle} (erlaubt: ${Object.keys(BUNDLES).join(", ")})`);
+}
+
+// Plugin aktiv: per Bundle oder Flag erzwungen, mit --no-<name> unterdrückt, sonst automatisch anhand des Inhalts
+const enabled = name => {
+  const p = PLUGINS[name];
+  if (flags.has(`--no-${name}`)) return false;
+  return flags.has(`--${name}`) || (bundle && BUNDLES[bundle].includes(p.license)) || p.auto();
+};
+const withMermaid = enabled("mermaid");
+const withKatex = enabled("katex");
+const withSwagger = enabled("swagger");
 
 // KaTeX-CSS: pro @font-face nur den woff2-Eintrag behalten, Font als data:-URI einbetten
 function katexCss() {
@@ -90,6 +114,7 @@ function swaggerJs() {
 const outArg = args.find(a => a.startsWith("--out="));
 const outName = mdArg
   ? path.basename(mdArg, path.extname(mdArg)) + ".html"
+  : bundle ? `tiny-md-full-${bundle}.html`
   : (withMermaid && withKatex ? "tiny-md-full"
     : withMermaid ? "tiny-md-mermaid"
     : withKatex ? "tiny-md-katex"

@@ -39,9 +39,9 @@ jobs:
           gh release create "$VERSION" \
             dist/tiny-md.html \
             dist/tiny-md-mermaid.html \
-            dist/tiny-md-full.html \
+            dist/tiny-md-full-mit.html \
+            dist/tiny-md-full-apache.html \
             dist/tiny-md-swagger.html \
-            dist/tiny-md-full-swagger.html \
             dist/beispiel.html \
             dist/diagramme.html \
             dist/api-beispiel.html \
@@ -54,9 +54,9 @@ jobs:
 
           - **tiny-md.html** – leere App (~100 kB): öffnet, rendert, bearbeitet und speichert .md-Dateien
           - **tiny-md-mermaid.html** – wie oben, zusätzlich mit Mermaid-Diagramm-Rendering (~3,5 MB)
-          - **tiny-md-full.html** – Mermaid und KaTeX-Formel-Rendering (~4,3 MB)
-          - **tiny-md-swagger.html** – mit SwaggerUI: öffnet OpenAPI-/Swagger-Spezifikationen (.yaml/.yml/.json) direkt (~1,8 MB) ¹
-          - **tiny-md-full-swagger.html** – Mermaid, KaTeX und SwaggerUI (~6 MB) ¹
+          - **tiny-md-full-mit.html** – volles MIT-Bundle: alle MIT-lizenzierten Plugins (Mermaid, KaTeX) (~4,3 MB)
+          - **tiny-md-full-apache.html** – volles Apache-Bundle: alles aus dem MIT-Bundle plus alle Apache-2.0-Plugins (SwaggerUI) (~6 MB) ¹
+          - **tiny-md-swagger.html** – nur SwaggerUI: öffnet OpenAPI-/Swagger-Spezifikationen (.yaml/.yml/.json) direkt (~1,8 MB) ¹
           - **beispiel.html** – App mit eingebettetem Beispieldokument inkl. Mermaid-Diagramm
           - **diagramme.html** – Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph
           - **api-beispiel.html** – Swagger-Variante mit eingebetteter Beispiel-OpenAPI-Spezifikation ¹

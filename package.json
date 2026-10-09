@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.js",
     "embed": "node build.js",
-    "test": "node build.js && node build.js --mermaid && node build.js --katex && node build.js --mermaid --katex && node build.js beispiel.md && node build.js diagramme.md && node build.js --swagger && node build.js --mermaid --katex --swagger && node build.js api-beispiel.yaml && node build.js api-beispiel.yaml --no-swagger --out=dist/api-ohne-swagger.html && node test/smoke.js"
+    "test": "node build.js && node build.js --mermaid && node build.js --katex && node build.js --mermaid --katex && node build.js --bundle=mit && node build.js --bundle=apache && node build.js beispiel.md && node build.js diagramme.md && node build.js --swagger && node build.js api-beispiel.yaml && node build.js api-beispiel.yaml --no-swagger --out=dist/api-ohne-swagger.html && node test/smoke.js"
   },
   "private": true,
   "dependencies": {

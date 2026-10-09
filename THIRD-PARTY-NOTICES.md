@@ -17,7 +17,7 @@ Lizenz, die bei Weitergabe einzuhalten ist (Bezug: npm-Registry, Versionen gemä
 ### Swagger UI (Apache-2.0)
 
 Swagger UI ist nur in den Swagger-Varianten enthalten (`tiny-md-swagger.html`,
-`tiny-md-full-swagger.html`, `api-beispiel.html`). Swagger UI steht unter der
+`tiny-md-full-apache.html`, `api-beispiel.html`). Swagger UI steht unter der
 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0); NOTICE:
 
 ```
