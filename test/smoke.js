@@ -146,6 +146,12 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
   /* ---------- OpenAPI / SwaggerUI ---------- */
   check("tiny-md.html enthält kein SwaggerUI", !fs.readFileSync(path.join(__dirname, "..", "dist", "tiny-md.html"), "utf8").includes(".swagger-ui "));
   check("tiny-md-swagger.html enthält SwaggerUI", distSize("tiny-md-swagger.html") > 1_000_000);
+  for (const f of ["tiny-md-swagger.html", "tiny-md-full-swagger.html", "api-beispiel.html"]) {
+    const h = fs.readFileSync(path.join(__dirname, "..", "dist", f), "utf8");
+    check(`${f}: Apache-2.0-Lizenztext + NOTICE eingebettet`,
+      h.includes("Apache License") && h.includes("SmartBear Software"));
+  }
+  check("tiny-md-full-swagger.html enthält Mermaid + KaTeX + SwaggerUI", distSize("tiny-md-full-swagger.html") > 5_000_000);
   {
     const wa = loadApp("api-beispiel.html");
     await new Promise(r => setTimeout(r, 1500)); // SwaggerUI parst/resolvt asynchron

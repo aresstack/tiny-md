@@ -6,17 +6,26 @@ Ein Markdown-Viewer und -Editor als **einzelne, offline-fähige HTML-Datei** –
 
 ## Download
 
-Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeugt automatisch ein [GitHub-Release](https://github.com/aresstack/tiny-md/releases/latest) mit:
+Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeugt automatisch zwei [GitHub-Releases](https://github.com/aresstack/tiny-md/releases): das Standard-Release `vX-N` und das Swagger-Release `vX-N-swagger` (enthält das Apache-2.0-lizenzierte SwaggerUI, siehe [Lizenz](#lizenz)).
+
+**Standard-Release** (`vX-N`, als „latest“ markiert):
 
 | Datei | Inhalt |
 | ----- | ------ |
 | `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
 | `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
 | `tiny-md-full.html` | Mermaid **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
-| `tiny-md-swagger.html` | mit [SwaggerUI](https://swagger.io/tools/swagger-ui/): öffnet OpenAPI-/Swagger-Spezifikationen (`.yaml`/`.yml`/`.json`) und zeigt sie direkt an (~1,8 MB) |
 | `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 | `diagramme.html` | Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph |
+
+**Swagger-Release** (`vX-N-swagger`, enthält SwaggerUI unter Apache-2.0):
+
+| Datei | Inhalt |
+| ----- | ------ |
+| `tiny-md-swagger.html` | mit [SwaggerUI](https://swagger.io/tools/swagger-ui/): öffnet OpenAPI-/Swagger-Spezifikationen (`.yaml`/`.yml`/`.json`) und zeigt sie direkt an (~1,8 MB) |
+| `tiny-md-full-swagger.html` | Mermaid, KaTeX **und** SwaggerUI (~6 MB) |
 | `api-beispiel.html` | Swagger-Variante mit fest eingebetteter Beispiel-OpenAPI-Spezifikation |
+| `LICENSE-Apache-2.0-SwaggerUI.txt`, `NOTICE-SwaggerUI.txt`, `LICENSE-MIT-tiny-md.txt` | Lizenztexte zum Beilegen bei Weitergabe |
 
 Datei herunterladen, doppelklicken, fertig.
 
@@ -49,6 +58,7 @@ node build.js --mermaid          # → dist/tiny-md-mermaid.html   (leere App in
 node build.js --katex            # → dist/tiny-md-katex.html     (leere App inkl. KaTeX)
 node build.js --mermaid --katex  # → dist/tiny-md-full.html      (beides)
 node build.js --swagger          # → dist/tiny-md-swagger.html   (leere App inkl. SwaggerUI)
+node build.js --mermaid --katex --swagger  # → dist/tiny-md-full-swagger.html
 node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
 node build.js pfad/zu/api.yaml   # → dist/api.html               (OpenAPI-Spezifikation fest eingebettet)
 ```
@@ -114,7 +124,17 @@ Baut beide Varianten und prüft sie in jsdom: Rendering (Überschriften, Tabelle
 
 ## Lizenz
 
-[MIT](LICENSE). Die eingebetteten Bibliotheken (marked: MIT, DOMPurify: Apache-2.0/MPL-2.0 dual, Mermaid: MIT, KaTeX: MIT, SwaggerUI: Apache-2.0) sind MIT-kompatibel; Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md). Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten.
+Der Code von tiny-md (Template, Build-Skript, Tests) steht unter der [MIT-Lizenz](LICENSE). **Die MIT-Lizenz gilt nicht für die eingebetteten Bibliotheken und Add-ons** – diese behalten ihre eigenen Lizenzen, und eine gebaute HTML-Datei ist ein Gesamtwerk aus tiny-md und diesen Bibliotheken:
+
+| Add-on | Lizenz | in welchen Dateien |
+| ------ | ------ | ------------------ |
+| marked | MIT | allen |
+| DOMPurify | Apache-2.0 (hier gewählt; alternativ MPL-2.0) | allen |
+| Mermaid | MIT | `*-mermaid*`, `*-full*`, `beispiel.html`, `diagramme.html` |
+| KaTeX (inkl. Schriften) | MIT | `*-katex*`, `*-full*`, `beispiel.html` |
+| **SwaggerUI** | **Apache-2.0** | nur im Swagger-Release: `*-swagger.html`, `api-beispiel.html` |
+
+Alle diese Lizenzen sind mit MIT kombinierbar und erlauben auch kommerzielle Nutzung und Weitergabe. Wer eine Datei weitergibt, muss die Lizenzbedingungen der enthaltenen Bibliotheken einhalten – bei Apache-2.0 heißt das insbesondere: Lizenztext und NOTICE beilegen bzw. erhalten. Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten; in die Swagger-Varianten werden zusätzlich der vollständige Apache-2.0-Lizenztext, die SwaggerUI-NOTICE und die Lizenz-Header der von SwaggerUI gebündelten Abhängigkeiten eingebettet, und das Swagger-Release enthält sie als separate Dateien. SwaggerUI wird deshalb in einem eigenen Release ausgeliefert, damit das Standard-Release ohne dieses Add-on bleibt. Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md).
 
 ---
 
