@@ -31,9 +31,7 @@ jobs:
           cp node_modules/swagger-ui-dist/NOTICE dist/NOTICE-SwaggerUI.txt
           cp LICENSE dist/LICENSE-MIT-tiny-md.txt
 
-      # Zwei getrennte Releases: die Standardvarianten (tiny-md selbst unter MIT)
-      # und die Swagger-Varianten mit dem Apache-2.0-lizenzierten SwaggerUI.
-      - name: Create Release (Standard, MIT)
+      - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -42,8 +40,14 @@ jobs:
             dist/tiny-md.html \
             dist/tiny-md-mermaid.html \
             dist/tiny-md-full.html \
+            dist/tiny-md-swagger.html \
+            dist/tiny-md-full-swagger.html \
             dist/beispiel.html \
             dist/diagramme.html \
+            dist/api-beispiel.html \
+            dist/LICENSE-MIT-tiny-md.txt \
+            dist/LICENSE-Apache-2.0-SwaggerUI.txt \
+            dist/NOTICE-SwaggerUI.txt \
             --target "$GITHUB_SHA" \
             --title "tiny-md $VERSION" \
             --notes "Offline-fähiger Markdown-Viewer/-Editor als einzelne HTML-Datei.
@@ -51,35 +55,14 @@ jobs:
           - **tiny-md.html** – leere App (~100 kB): öffnet, rendert, bearbeitet und speichert .md-Dateien
           - **tiny-md-mermaid.html** – wie oben, zusätzlich mit Mermaid-Diagramm-Rendering (~3,5 MB)
           - **tiny-md-full.html** – Mermaid und KaTeX-Formel-Rendering (~4,3 MB)
+          - **tiny-md-swagger.html** – mit SwaggerUI: öffnet OpenAPI-/Swagger-Spezifikationen (.yaml/.yml/.json) direkt (~1,8 MB) ¹
+          - **tiny-md-full-swagger.html** – Mermaid, KaTeX und SwaggerUI (~6 MB) ¹
           - **beispiel.html** – App mit eingebettetem Beispieldokument inkl. Mermaid-Diagramm
           - **diagramme.html** – Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph
+          - **api-beispiel.html** – Swagger-Variante mit eingebetteter Beispiel-OpenAPI-Spezifikation ¹
 
-          **Lizenz:** tiny-md steht unter MIT. Eingebettete Bibliotheken behalten ihre eigenen Lizenzen (siehe THIRD-PARTY-NOTICES.md). OpenAPI/SwaggerUI gibt es als eigenes Release \`$VERSION-swagger\` (Apache-2.0-Komponente).
+          **Lizenz:** tiny-md steht unter MIT; die MIT-Lizenz gilt nur für den tiny-md-Code. Eingebettete Bibliotheken behalten ihre eigenen Lizenzen (siehe THIRD-PARTY-NOTICES.md).
+          ¹ Enthält [Swagger UI](https://github.com/swagger-api/swagger-ui) (© SmartBear Software Inc.) unter der **Apache License 2.0** – bei Weitergabe Lizenztext und NOTICE beilegen (in den Dateien eingebettet, zusätzlich als LICENSE-Apache-2.0-SwaggerUI.txt / NOTICE-SwaggerUI.txt angehängt).
 
           Build aus ${{ github.sha }}" \
             --latest
-
-      - name: Create Release (SwaggerUI, Apache-2.0-Komponente)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="v$(node -p "require('./package.json').version")-${{ github.run_number }}"
-          gh release create "$VERSION-swagger" \
-            dist/tiny-md-swagger.html \
-            dist/tiny-md-full-swagger.html \
-            dist/api-beispiel.html \
-            dist/LICENSE-Apache-2.0-SwaggerUI.txt \
-            dist/NOTICE-SwaggerUI.txt \
-            dist/LICENSE-MIT-tiny-md.txt \
-            --target "$GITHUB_SHA" \
-            --title "tiny-md $VERSION + SwaggerUI" \
-            --notes "tiny-md mit eingebautem SwaggerUI: öffnet OpenAPI-/Swagger-Spezifikationen (.yaml/.yml/.json) direkt und zeigt sie an.
-
-          - **tiny-md-swagger.html** – App + SwaggerUI (~1,8 MB)
-          - **tiny-md-full-swagger.html** – App + Mermaid + KaTeX + SwaggerUI (~6 MB)
-          - **api-beispiel.html** – Swagger-Variante mit eingebetteter Beispiel-OpenAPI-Spezifikation
-
-          **Lizenz – bitte beachten:** Diese Dateien enthalten [Swagger UI](https://github.com/swagger-api/swagger-ui) (© SmartBear Software Inc.) unter der **Apache License 2.0**. Die MIT-Lizenz von tiny-md gilt nur für den tiny-md-Code, nicht für SwaggerUI. Bei Weitergabe gelten für SwaggerUI die Bedingungen der Apache-2.0 (Lizenztext und NOTICE beilegen bzw. erhalten). Lizenztext, NOTICE und die Lizenz-Header der gebündelten Abhängigkeiten sind in den HTML-Dateien eingebettet und liegen zusätzlich als Dateien bei.
-
-          Build aus ${{ github.sha }}" \
-            --latest=false
