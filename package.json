@@ -13,6 +13,7 @@
     "katex": "^0.18.9",
     "marked": "^18.0.14",
     "mermaid": "^11.17.2",
+    "prismjs": "^1.30.0",
     "swagger-ui-dist": "^5.33.1"
   },
   "devDependencies": {

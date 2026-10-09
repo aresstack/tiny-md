@@ -185,6 +185,31 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("full-apache: Mermaid + KaTeX + SwaggerUI enthalten", distSize("tiny-md-full-apache.html") > 5_000_000);
     const wm = loadApp("tiny-md-full-mit.html");
     check("full-mit: App startet", /<h1[^>]*>tiny-md<\/h1>/.test(wm.document.getElementById("preview").innerHTML));
+    check("full-mit: Prism enthalten", mit.includes("Prism.js | MIT License"));
+    check("full-mit: JSON-Codeblock hervorgehoben",
+      wm.document.querySelector('#preview code.language-json .token.property') !== null);
+    const apache = fs.readFileSync(path.join(__dirname, "..", "dist", "tiny-md-full-apache.html"), "utf8");
+    check("full-apache: Prism enthalten", apache.includes("Prism.js | MIT License"));
+  }
+
+  /* ---------- Syntax-Highlighting ---------- */
+  {
+    const wb = loadApp("beispiel.html");
+    const js = wb.document.querySelector("#preview code.language-js");
+    check("highlight: js-Block in beispiel.html hervorgehoben", js && js.querySelector(".token.keyword") !== null);
+    check("highlight: Mermaid-Block nicht angefasst",
+      wb.document.querySelector("#preview code.language-mermaid .token") === null);
+    const wl = loadApp("tiny-md.html");
+    check("highlight: schlanke tiny-md.html ohne Prism", !wl.document.documentElement.outerHTML.includes("Prism.js | MIT"));
+    const ed = wl.document.getElementById("editor");
+    ed.value = "```js\nconst a = 1;\n```";
+    ed.dispatchEvent(new wl.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    check("highlight: ohne Prism bleibt Codeblock schlicht lesbar",
+      wl.document.querySelector("#preview code.language-js").textContent.includes("const a = 1;"));
+    const wp = loadApp("api-ohne-swagger.html");
+    check("highlight: YAML ohne Swagger hervorgehoben",
+      wp.document.querySelector("#preview code.language-yaml .token") !== null);
   }
   {
     const wa = loadApp("api-beispiel.html");
