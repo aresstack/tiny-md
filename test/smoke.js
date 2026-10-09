@@ -47,7 +47,7 @@ function distSize(file) {
   check("beispiel: Codeblock gerendert", preview.querySelector("pre code") !== null);
   check("beispiel: Task-Checkbox gerendert", preview.querySelector('input[type="checkbox"]') !== null);
   check("beispiel: XSS-Skript entfernt", preview.querySelector("script") === null && !preview.innerHTML.includes("alert("));
-  check("beispiel: Dateiname angezeigt", w.document.getElementById("file-label").textContent.includes("beispiel.md"));
+  check("beispiel: Dateiname angezeigt", w.document.title.includes("beispiel.md"));
   check("beispiel: Umlaute intakt", preview.innerHTML.includes("Umlaute (ä, ö, ü, ß)"));
   check("beispiel: startet im Lesemodus", w.document.body.classList.contains("mode-read"));
   check("beispiel: Mermaid-Block vorhanden (Diagramm oder Code-Fallback)",
@@ -93,6 +93,13 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
   editor.value = "## Neu getippt";
   editor.dispatchEvent(new w.Event("input", { bubbles: true }));
   check("leer: Eingabe markiert Dokument als geändert", w.document.title.startsWith("●"));
+  check("leer: Speichern-Button zeigt ungespeicherte Änderungen", w.document.getElementById("btn-save").classList.contains("modified"));
+  check("leer: keine obere Toolbar mehr", w.document.getElementById("toolbar") === null);
+  const btnEdit = w.document.getElementById("btn-edit");
+  btnEdit.click();
+  check("leer: Bearbeiten-Toggle aktiviert Editor", w.document.body.classList.contains("mode-edit") && btnEdit.getAttribute("aria-pressed") === "true");
+  btnEdit.click();
+  check("leer: Bearbeiten-Toggle zurück zum Lesen", w.document.body.classList.contains("mode-read") && btnEdit.getAttribute("aria-pressed") === "false");
 }
 
 /* ---------- Sanitisierung: bösartiges / „nach Hause telefonierendes" Markdown ---------- */
@@ -121,6 +128,25 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
   check("sanitize: Fernbild entfernt", preview.querySelector('img[src*="//"]') === null);
   check("sanitize: keine Fern-URL im Ergebnis", !html.includes("example.com"));
   check("sanitize: data-URI-Bild bleibt", preview.querySelector('img[src^="data:image/svg+xml"]') !== null);
+
+  /* ---------- Drag & Drop: Datei wird nach dem Ablegen geöffnet ---------- */
+  {
+    const wd = loadApp("tiny-md.html");
+    const file = new wd.File(["# Abgelegt"], "drop.md", { type: "text/markdown" });
+    // Wie im Browser: DataTransfer ist nur während des synchronen Dispatch lesbar
+    const dt = {
+      files: [file],
+      items: [{ kind: "file", getAsFileSystemHandle: () => Promise.resolve({ kind: "file", name: "drop.md" }) }],
+    };
+    const ev = new wd.Event("drop", { bubbles: true, cancelable: true });
+    ev.dataTransfer = dt;
+    wd.document.dispatchEvent(ev);
+    dt.files = []; dt.items = [];
+    await new Promise(r => setTimeout(r, 100));
+    check("drop: abgelegte Datei geöffnet", /<h1[^>]*>Abgelegt<\/h1>/.test(wd.document.getElementById("preview").innerHTML),
+      wd.document.getElementById("preview").innerHTML.slice(0, 120));
+    check("drop: Dateiname übernommen", wd.document.title.includes("drop.md"));
+  }
 
   /* ---------- Mathe: Roundtrip über den Editor-Eingabepfad ---------- */
   {
@@ -162,7 +188,7 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
       sw.textContent.slice(0, 200));
     check("openapi: alle 4 Operationen gerendert", sw.querySelectorAll(".opblock").length === 4,
       sw.querySelectorAll(".opblock").length);
-    check("openapi: Dateiname angezeigt", wa.document.getElementById("file-label").textContent.includes("api-beispiel.yaml"));
+    check("openapi: Dateiname angezeigt", wa.document.title.includes("api-beispiel.yaml"));
 
     // Live-Bearbeitung: Titel im Editor ändern → SwaggerUI aktualisiert sich
     const ed = wa.document.getElementById("editor");

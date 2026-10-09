@@ -40,40 +40,6 @@ body {
   overflow: hidden;
 }
 
-/* ---------- Toolbar ---------- */
-#toolbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-soft);
-}
-#toolbar button {
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  cursor: pointer;
-}
-#toolbar button:hover { border-color: var(--accent); color: var(--accent); }
-#toolbar button:disabled { opacity: 0.45; cursor: default; }
-#toolbar button:disabled:hover { border-color: var(--border); color: var(--fg); }
-#toolbar .spacer { flex: 1; }
-#file-label {
-  font-size: 13px;
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 40vw;
-}
-#file-label .dot { color: var(--accent); font-weight: 700; }
-
 /* ---------- Workspace ---------- */
 #workspace {
   flex: 1;
@@ -186,15 +152,50 @@ html[data-theme="dark"] #swagger { filter: invert(0.92) hue-rotate(180deg); }
 /* ---------- Statusleiste ---------- */
 #statusbar {
   flex: none;
-  display: flex;
-  gap: 18px;
-  padding: 5px 14px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   font-size: 12px;
   color: var(--fg-muted);
   border-top: 1px solid var(--border);
   background: var(--bg-soft);
 }
-#statusbar .spacer { flex: 1; }
+#statusbar .left { display: flex; }
+#statusbar .right { display: flex; justify-content: flex-end; gap: 18px; padding: 0 14px; }
+/* Quadratische Icon-Buttons ohne Abstand, Beschriftung per Tooltip (title) */
+.icon-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--border); color: var(--fg); }
+.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn[aria-pressed="true"] { color: var(--accent); }
+.icon-btn .ico-read { display: none; }
+body.mode-edit #btn-edit .ico-edit { display: none; }
+body.mode-edit #btn-edit .ico-read { display: block; }
+/* Ungespeicherte Änderungen: Punkt am Speichern-Button */
+#btn-save.modified::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 #copyright { color: var(--fg-muted); text-decoration: none; opacity: 0.75; }
 #copyright:hover { color: var(--accent); opacity: 1; }
 
@@ -217,7 +218,7 @@ body.dragging #drop-overlay { display: flex; }
 
 /* ---------- Druck: nur der gerenderte Inhalt ---------- */
 @media print {
-  #toolbar, #statusbar, #editor-pane { display: none !important; }
+  #statusbar, #editor-pane { display: none !important; }
   body { overflow: visible; }
   #preview-pane { overflow: visible; }
   .md-body { max-width: none; padding: 0; }
@@ -228,15 +229,6 @@ body.dragging #drop-overlay { display: flex; }
 <style>/*__SWAGGER_CSS__*/</style>
 </head>
 <body class="mode-read">
-
-<header id="toolbar">
-  <button id="btn-open" title="Markdown-Datei öffnen (Strg+O)">Öffnen</button>
-  <button id="btn-edit" title="Zwischen Lesen und Bearbeiten wechseln (Strg+E)">Bearbeiten</button>
-  <button id="btn-save" title="Markdown speichern (Strg+S)">Speichern</button>
-  <span class="spacer"></span>
-  <span id="file-label"></span>
-  <button id="btn-theme" title="Hell/Dunkel umschalten">◐</button>
-</header>
 
 <main id="workspace">
   <section id="editor-pane">
@@ -249,10 +241,25 @@ body.dragging #drop-overlay { display: flex; }
 </main>
 
 <footer id="statusbar">
-  <span id="status-mode"></span>
-  <span class="spacer"></span>
-  <span id="status-count"></span>
-  <a id="copyright" href="https://github.com/aresstack" target="_blank" rel="noopener">© 2026 AresStack</a>
+  <div class="left">
+    <button id="btn-open" class="icon-btn" title="Datei öffnen (Strg+O)" aria-label="Datei öffnen">
+      <svg viewBox="0 0 16 16"><path d="M1.5 3.5v9h11l2-6h-11l-2 6"/><path d="M1.5 3.5h4l1.5 1.5h5v1.5"/></svg>
+    </button>
+    <button id="btn-save" class="icon-btn" title="Speichern (Strg+S)" aria-label="Speichern">
+      <svg viewBox="0 0 16 16"><path d="M2.5 2.5h9l2 2v9h-11z"/><path d="M5 2.5v3.5h5v-3.5"/><path d="M4.5 13.5v-4.5h7v4.5"/></svg>
+    </button>
+    <button id="btn-edit" class="icon-btn" title="Bearbeiten (Strg+E)" aria-label="Bearbeiten" aria-pressed="false">
+      <svg class="ico-edit" viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-8 8h-3v-3z"/><path d="M9 4l3 3"/></svg>
+      <svg class="ico-read" viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
+    </button>
+  </div>
+  <button id="btn-theme" class="icon-btn" title="Hell/Dunkel umschalten" aria-label="Hell/Dunkel umschalten">
+    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>
+  </button>
+  <div class="right">
+    <span id="status-count"></span>
+    <a id="copyright" href="https://github.com/aresstack" target="_blank" rel="noopener">© 2026 AresStack</a>
+  </div>
 </footer>
 
 <div id="drop-overlay">Datei hier ablegen</div>
@@ -426,8 +433,6 @@ const el = {
   swagger: document.getElementById("swagger"),
   previewPane: document.getElementById("preview-pane"),
   fileInput: document.getElementById("file-input"),
-  fileLabel: document.getElementById("file-label"),
-  statusMode: document.getElementById("status-mode"),
   statusCount: document.getElementById("status-count"),
   btnOpen: document.getElementById("btn-open"),
   btnEdit: document.getElementById("btn-edit"),
@@ -452,11 +457,11 @@ function updatePreview() {
 }
 
 function updateChrome() {
-  const dot = state.modified ? ' <span class="dot" title="ungespeicherte Änderungen">●</span>' : "";
-  el.fileLabel.innerHTML = escapeHtml(state.filename) + dot;
+  el.btnSave.classList.toggle("modified", state.modified);
+  el.btnSave.title = "Speichern (Strg+S)" + (state.modified ? " – ungespeicherte Änderungen" : "");
   const isEdit = document.body.classList.contains("mode-edit");
-  el.btnEdit.textContent = isEdit ? "Lesen" : "Bearbeiten";
-  el.statusMode.textContent = isEdit ? "Bearbeiten" : "Lesen";
+  el.btnEdit.setAttribute("aria-pressed", String(isEdit));
+  el.btnEdit.title = isEdit ? "Zurück zur Leseansicht (Strg+E)" : "Bearbeiten (Strg+E)";
   const words = (state.content.match(/\S+/g) || []).length;
   el.statusCount.textContent = words + " Wörter · " + state.content.length + " Zeichen";
   document.title = (state.modified ? "● " : "") + state.filename + " – tiny-md";
@@ -538,15 +543,19 @@ document.addEventListener("drop", async e => {
   e.preventDefault();
   dragDepth = 0;
   document.body.classList.remove("dragging");
-  // Wenn möglich, den FileSystemHandle mitnehmen → direktes Zurückspeichern
+  // DataTransfer ist nur synchron im Event-Handler lesbar – nach dem ersten
+  // await sind files/items leer. Daher Datei und Handle-Promise vorher holen.
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
   const item = e.dataTransfer.items && e.dataTransfer.items[0];
+  const handlePromise = item && item.getAsFileSystemHandle ? item.getAsFileSystemHandle() : null;
+  // Wenn möglich, den FileSystemHandle mitnehmen → direktes Zurückspeichern
   let handle = null;
-  if (item && item.getAsFileSystemHandle) {
-    try { handle = await item.getAsFileSystemHandle(); } catch (_) {}
+  if (handlePromise) {
+    try { handle = await handlePromise; } catch (_) {}
     if (handle && handle.kind !== "file") handle = null;
   }
-  const file = e.dataTransfer.files[0];
-  if (file) await loadFile(file, handle);
+  await loadFile(file, handle);
 });
 
 /* ---------- Speichern ---------- */
