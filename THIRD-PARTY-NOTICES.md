@@ -17,8 +17,7 @@ Lizenz, die bei Weitergabe einzuhalten ist (Bezug: npm-Registry, Versionen gemä
 ### Swagger UI (Apache-2.0)
 
 Swagger UI ist nur in den Swagger-Varianten enthalten (`tiny-md-swagger.html`,
-`tiny-md-full-swagger.html`, `api-beispiel.html`), die als eigenes Release
-`vX-N-swagger` veröffentlicht werden. Swagger UI steht unter der
+`tiny-md-full-swagger.html`, `api-beispiel.html`). Swagger UI steht unter der
 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0); NOTICE:
 
 ```
@@ -28,7 +27,7 @@ Copyright 2020-2021 SmartBear Software Inc.
 
 Bei Weitergabe dieser Dateien müssen der Apache-2.0-Lizenztext und die NOTICE
 mitgegeben werden. Beides ist in die HTML-Dateien eingebettet und liegt dem
-Swagger-Release zusätzlich als `LICENSE-Apache-2.0-SwaggerUI.txt` und
+Release zusätzlich als `LICENSE-Apache-2.0-SwaggerUI.txt` und
 `NOTICE-SwaggerUI.txt` bei.
 
 Nur zur Entwicklung (nicht im Auslieferungsartefakt enthalten):
