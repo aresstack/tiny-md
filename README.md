@@ -38,6 +38,7 @@ Datei herunterladen, doppelklicken, fertig.
   - Edge/Chrome: direkt zurück in die Originaldatei (File System Access API)
   - Firefox: als Download
 - Warnung beim Schließen mit ungespeicherten Änderungen
+- **Bedienung über die Statusleiste unten:** Icon-Buttons für Öffnen, Speichern (Punkt = ungespeicherte Änderungen) und Bearbeiten/Lesen-Umschalter links, Hell/Dunkel mittig, Wort-/Zeichenzahl rechts – keine eigene Toolbar, der Dateiname steht im Fenstertitel
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
 - **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
 - **LaTeX-Formeln** (optional): `$…$` und `$$…$$` werden mit [KaTeX](https://katex.org/) gerendert (Schriften eingebettet, unbekannte Makros erscheinen als roter Fehlertext statt das Dokument zu brechen). Ein eigener Tokenizer schützt Formeln vor der Markdown-Escape-Verarbeitung — `\,`, `\{` & Co. bleiben auch **ohne** KaTeX-Variante unzerstört. Dollar-Beträge (`$5 und $10`) bleiben normaler Text; falls die Heuristik doch anspringt: `\$` schreiben oder `--no-katex` bauen
