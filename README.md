@@ -12,11 +12,11 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 | ----- | ------ |
 | `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
 | `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
-| `tiny-md-full.html` | Mermaid **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
+| `tiny-md-full-mit.html` | **volles MIT-Bundle:** alle MIT-lizenzierten Plugins – [Mermaid](https://mermaid.js.org/) **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
+| `tiny-md-full-apache.html` ¹ | **volles Apache-Bundle:** alles aus dem MIT-Bundle plus alle Apache-2.0-Plugins – derzeit [SwaggerUI](https://swagger.io/tools/swagger-ui/) (~6 MB) |
 | `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 | `diagramme.html` | Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph |
 | `tiny-md-swagger.html` ¹ | mit [SwaggerUI](https://swagger.io/tools/swagger-ui/): öffnet OpenAPI-/Swagger-Spezifikationen (`.yaml`/`.yml`/`.json`) und zeigt sie direkt an (~1,8 MB) |
-| `tiny-md-full-swagger.html` ¹ | Mermaid, KaTeX **und** SwaggerUI (~6 MB) |
 | `api-beispiel.html` ¹ | Swagger-Variante mit fest eingebetteter Beispiel-OpenAPI-Spezifikation |
 | `LICENSE-Apache-2.0-SwaggerUI.txt`, `NOTICE-SwaggerUI.txt`, `LICENSE-MIT-tiny-md.txt` | Lizenztexte zum Beilegen bei Weitergabe |
 
@@ -53,8 +53,9 @@ npm run build                    # → dist/tiny-md.html           (leere App)
 node build.js --mermaid          # → dist/tiny-md-mermaid.html   (leere App inkl. Mermaid)
 node build.js --katex            # → dist/tiny-md-katex.html     (leere App inkl. KaTeX)
 node build.js --mermaid --katex  # → dist/tiny-md-full.html      (beides)
+node build.js --bundle=mit       # → dist/tiny-md-full-mit.html    (alle MIT-Plugins)
+node build.js --bundle=apache    # → dist/tiny-md-full-apache.html (alle MIT- und Apache-2.0-Plugins)
 node build.js --swagger          # → dist/tiny-md-swagger.html   (leere App inkl. SwaggerUI)
-node build.js --mermaid --katex --swagger  # → dist/tiny-md-full-swagger.html
 node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
 node build.js pfad/zu/api.yaml   # → dist/api.html               (OpenAPI-Spezifikation fest eingebettet)
 ```
@@ -126,9 +127,11 @@ Der Code von tiny-md (Template, Build-Skript, Tests) steht unter der [MIT-Lizenz
 | ------ | ------ | ------------------ |
 | marked | MIT | allen |
 | DOMPurify | Apache-2.0 (hier gewählt; alternativ MPL-2.0) | allen |
-| Mermaid | MIT | `*-mermaid*`, `*-full*`, `beispiel.html`, `diagramme.html` |
-| KaTeX (inkl. Schriften) | MIT | `*-katex*`, `*-full*`, `beispiel.html` |
-| **SwaggerUI** | **Apache-2.0** | `*-swagger.html`, `api-beispiel.html` |
+| Mermaid | MIT | `*-mermaid*`, `*-full*` (beide Bundles), `beispiel.html`, `diagramme.html` |
+| KaTeX (inkl. Schriften) | MIT | `*-katex*`, `*-full*` (beide Bundles), `beispiel.html` |
+| **SwaggerUI** | **Apache-2.0** | `tiny-md-full-apache.html`, `*-swagger.html`, `api-beispiel.html` |
+
+**Lizenz-Bundles:** Jedes Plugin ist in `build.js` (`PLUGINS`) mit seiner Lizenz eingetragen. `--bundle=mit` baut alle MIT-lizenzierten Plugins ein, `--bundle=apache` zusätzlich alle Apache-2.0-Plugins. Ein neues Plugin landet damit automatisch im passenden Bundle – ein künftiges Apache-2.0-Plugin also nur in `tiny-md-full-apache.html`, nie in `tiny-md-full-mit.html`.
 
 Alle diese Lizenzen sind mit MIT kombinierbar und erlauben auch kommerzielle Nutzung und Weitergabe. Wer eine Datei weitergibt, muss die Lizenzbedingungen der enthaltenen Bibliotheken einhalten – bei Apache-2.0 heißt das insbesondere: Lizenztext und NOTICE beilegen bzw. erhalten. Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten; in die Swagger-Varianten werden zusätzlich der vollständige Apache-2.0-Lizenztext, die SwaggerUI-NOTICE und die Lizenz-Header der von SwaggerUI gebündelten Abhängigkeiten eingebettet, und das Release enthält sie zusätzlich als separate Dateien. Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md).
 
