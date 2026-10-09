@@ -13,8 +13,10 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 | `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
 | `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
 | `tiny-md-full.html` | Mermaid **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
+| `tiny-md-swagger.html` | mit [SwaggerUI](https://swagger.io/tools/swagger-ui/): öffnet OpenAPI-/Swagger-Spezifikationen (`.yaml`/`.yml`/`.json`) und zeigt sie direkt an (~1,8 MB) |
 | `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 | `diagramme.html` | Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph |
+| `api-beispiel.html` | Swagger-Variante mit fest eingebetteter Beispiel-OpenAPI-Spezifikation |
 
 Datei herunterladen, doppelklicken, fertig.
 
@@ -30,6 +32,7 @@ Datei herunterladen, doppelklicken, fertig.
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
 - **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
 - **LaTeX-Formeln** (optional): `$…$` und `$$…$$` werden mit [KaTeX](https://katex.org/) gerendert (Schriften eingebettet, unbekannte Makros erscheinen als roter Fehlertext statt das Dokument zu brechen). Ein eigener Tokenizer schützt Formeln vor der Markdown-Escape-Verarbeitung — `\,`, `\{` & Co. bleiben auch **ohne** KaTeX-Variante unzerstört. Dollar-Beträge (`$5 und $10`) bleiben normaler Text; falls die Heuristik doch anspringt: `\$` schreiben oder `--no-katex` bauen
+- **OpenAPI/Swagger** (optional, `tiny-md-swagger.html`): `.yaml`-, `.yml`- oder `.json`-Dateien mit `openapi:`/`swagger:`-Versionsangabe werden per Öffnen oder Drag & Drop mit [SwaggerUI](https://swagger.io/tools/swagger-ui/) angezeigt (OpenAPI 2.0/3.x). Im Bearbeiten-Modus aktualisiert sich die Ansicht live, Speichern schreibt die YAML/JSON-Datei zurück. Hell/Dunkel wird übernommen. In den übrigen Varianten erscheint eine Spezifikation als Codeblock mit Hinweis auf die Swagger-Variante. Hinweis: SwaggerUI rendert Beschreibungen selbst – der „nach Hause telefonieren"-Schutz unten gilt dort nicht; „Try it out" sowie externe `$ref`s (`https://…`) erzeugen bewusst Netzwerkzugriffe.
 - **SVG-Grafiken:** funktionieren auf zwei Wegen direkt im Markdown –
   - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
   - als Bild mit Data-URI: `![Alt-Text](data:image/svg+xml;base64,…)`
@@ -45,10 +48,12 @@ npm run build                    # → dist/tiny-md.html           (leere App)
 node build.js --mermaid          # → dist/tiny-md-mermaid.html   (leere App inkl. Mermaid)
 node build.js --katex            # → dist/tiny-md-katex.html     (leere App inkl. KaTeX)
 node build.js --mermaid --katex  # → dist/tiny-md-full.html      (beides)
+node build.js --swagger          # → dist/tiny-md-swagger.html   (leere App inkl. SwaggerUI)
 node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
+node build.js pfad/zu/api.yaml   # → dist/api.html               (OpenAPI-Spezifikation fest eingebettet)
 ```
 
-Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. Enthält das eingebettete Markdown ` ```mermaid `-Blöcke bzw. `$…$`/`$$…$$`-Formeln, werden Mermaid bzw. KaTeX **automatisch** mit eingebaut; erzwingen bzw. unterdrücken lässt sich das mit `--mermaid`/`--no-mermaid` und `--katex`/`--no-katex`. `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
+Der Name der Ausgabedatei ergibt sich aus dem Namen der übergebenen `.md`-Datei. Enthält das eingebettete Markdown ` ```mermaid `-Blöcke bzw. `$…$`/`$$…$$`-Formeln, werden Mermaid bzw. KaTeX **automatisch** mit eingebaut; erzwingen bzw. unterdrücken lässt sich das mit `--mermaid`/`--no-mermaid` und `--katex`/`--no-katex`. Analog bringt eine eingebettete OpenAPI-Spezifikation (`.yaml`/`.yml`/`.json`) SwaggerUI automatisch mit (`--swagger`/`--no-swagger`); `--swagger` lässt sich mit den anderen Flags kombinieren (z. B. `--mermaid --swagger` → `tiny-md-mermaid-swagger.html`). `build.js` inlinet [marked](https://github.com/markedjs/marked) (Rendering) und [DOMPurify](https://github.com/cure53/DOMPurify) (Sanitizing) ins Template – die fertige Datei ist ~90 kB groß und komplett offline nutzbar.
 
 ### Eigenes Dokument als Anhang verschicken
 
@@ -95,6 +100,7 @@ src/template.html         – die komplette App (HTML + CSS + JS) mit Platzhalte
 build.js                  – inlinet die Libraries und optional ein Markdown-Dokument
 test/smoke.js             – lädt die gebauten Dateien in jsdom und prüft das Rendering
 beispiel.md               – Testdokument
+api-beispiel.yaml         – Beispiel-OpenAPI-Spezifikation (→ api-beispiel.html)
 .github/workflows/…       – CI: baut, testet und veröffentlicht das Release
 ```
 
@@ -108,7 +114,7 @@ Baut beide Varianten und prüft sie in jsdom: Rendering (Überschriften, Tabelle
 
 ## Lizenz
 
-[MIT](LICENSE). Die eingebetteten Bibliotheken (marked: MIT, DOMPurify: Apache-2.0/MPL-2.0 dual, Mermaid: MIT) sind MIT-kompatibel; Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md). Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten.
+[MIT](LICENSE). Die eingebetteten Bibliotheken (marked: MIT, DOMPurify: Apache-2.0/MPL-2.0 dual, Mermaid: MIT, KaTeX: MIT, SwaggerUI: Apache-2.0) sind MIT-kompatibel; Details in den [Third-Party-Notices](THIRD-PARTY-NOTICES.md). Die Lizenz-Header der Bibliotheken bleiben in den gebauten HTML-Dateien erhalten.
 
 ---
 

@@ -174,6 +174,14 @@ body.mode-edit .md-body { padding-top: 24px; }
 .md-body .mermaid-diagram { margin: 1.2em 0; text-align: center; }
 .md-body .mermaid-diagram svg { max-width: 100%; height: auto; }
 .md-body .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.md-body .openapi-hint { color: var(--fg-muted); font-size: 0.9em; }
+
+/* ---------- OpenAPI / SwaggerUI ---------- */
+#swagger { display: none; min-height: 100%; background: #ffffff; color: #3b4151; padding: 8px 0 96px; }
+body.view-openapi #swagger { display: block; }
+body.view-openapi #preview { display: none; }
+/* SwaggerUI kennt kein Dark-Theme – im Dunkelmodus invertieren (Farben per hue-rotate erhalten) */
+html[data-theme="dark"] #swagger { filter: invert(0.92) hue-rotate(180deg); }
 
 /* ---------- Statusleiste ---------- */
 #statusbar {
@@ -213,9 +221,11 @@ body.dragging #drop-overlay { display: flex; }
   body { overflow: visible; }
   #preview-pane { overflow: visible; }
   .md-body { max-width: none; padding: 0; }
+  html[data-theme="dark"] #swagger { filter: none; }
 }
 </style>
 <style>/*__KATEX_CSS__*/</style>
+<style>/*__SWAGGER_CSS__*/</style>
 </head>
 <body class="mode-read">
 
@@ -234,6 +244,7 @@ body.dragging #drop-overlay { display: flex; }
   </section>
   <section id="preview-pane">
     <article id="preview" class="md-body"></article>
+    <div id="swagger"></div>
   </section>
 </main>
 
@@ -244,8 +255,8 @@ body.dragging #drop-overlay { display: flex; }
   <a id="copyright" href="https://github.com/aresstack" target="_blank" rel="noopener">© 2026 AresStack</a>
 </footer>
 
-<div id="drop-overlay">Markdown-Datei hier ablegen</div>
-<input type="file" id="file-input" accept=".md,.markdown,.mdown,.txt" hidden>
+<div id="drop-overlay">Datei hier ablegen</div>
+<input type="file" id="file-input" accept=".md,.markdown,.mdown,.txt,.yaml,.yml,.json" hidden>
 
 <!-- Eingebettetes Dokument: wird vom Build-Skript befüllt. Leer = App startet ohne Dokument. -->
 <script type="text/markdown" id="embedded-md" data-filename="__EMBEDDED_FILENAME__">__EMBEDDED_MD__</script>
@@ -254,6 +265,7 @@ body.dragging #drop-overlay { display: flex; }
 <script>/*__PURIFY_JS__*/</script>
 <script>/*__MERMAID_JS__*/</script>
 <script>/*__KATEX_JS__*/</script>
+<script>/*__SWAGGER_JS__*/</script>
 
 <script>
 "use strict";
@@ -363,6 +375,42 @@ async function renderMermaidIn(container) {
   }
 }
 
+/* ---------- OpenAPI (optional, nur in der Swagger-Build-Variante enthalten) ----------
+   .yaml/.yml/.json-Dateien mit openapi:/swagger:-Versionsangabe werden mit
+   SwaggerUI angezeigt; ohne SwaggerUI (oder bei anderem YAML/JSON) als Codeblock. */
+const hasSwagger = typeof SwaggerUIBundle !== "undefined";
+const SPEC_EXT = /\.(ya?ml|json)$/i;
+
+function isOpenApi(filename, text) {
+  return SPEC_EXT.test(filename) &&
+    /(^|[{,]\s*)["']?(openapi|swagger)["']?\s*:\s*["']?\d/m.test(text);
+}
+
+// YAML/JSON, das nicht mit SwaggerUI angezeigt wird, als Codeblock rendern
+function specAsMarkdown(filename, text) {
+  const longest = Math.max(2, ...(text.match(/`+/g) || []).map(t => t.length));
+  const fence = "`".repeat(longest + 1);
+  const lang = /\.json$/i.test(filename) ? "json" : "yaml";
+  const hint = isOpenApi(filename, text)
+    ? '<p class="openapi-hint">OpenAPI-Spezifikation erkannt – zur grafischen Anzeige <code>tiny-md-swagger.html</code> verwenden.</p>\n\n'
+    : "";
+  return hint + fence + lang + "\n" + text + "\n" + fence + "\n";
+}
+
+let swaggerUi = null;
+function renderSwagger(text) {
+  if (!swaggerUi) {
+    swaggerUi = SwaggerUIBundle({
+      domNode: el.swagger,
+      validatorUrl: null,       // kein Badge von validator.swagger.io nachladen
+      deepLinking: false,
+      presets: [SwaggerUIBundle.presets.apis],
+      layout: "BaseLayout",
+    });
+  }
+  swaggerUi.specActions.updateSpec(text);
+}
+
 /* ---------- State ---------- */
 const state = {
   filename: "dokument.md",
@@ -375,6 +423,7 @@ const state = {
 const el = {
   editor: document.getElementById("editor"),
   preview: document.getElementById("preview"),
+  swagger: document.getElementById("swagger"),
   previewPane: document.getElementById("preview-pane"),
   fileInput: document.getElementById("file-input"),
   fileLabel: document.getElementById("file-label"),
@@ -388,7 +437,12 @@ const el = {
 
 /* ---------- Anzeige ---------- */
 function updatePreview() {
-  el.preview.innerHTML = renderMarkdown(state.content);
+  const openapi = hasSwagger && isOpenApi(state.filename, state.content);
+  document.body.classList.toggle("view-openapi", openapi);
+  if (openapi) { renderSwagger(state.content); return; }
+  el.preview.innerHTML = renderMarkdown(SPEC_EXT.test(state.filename)
+    ? specAsMarkdown(state.filename, state.content)
+    : state.content);
   // Links aus fremden Dokumenten immer in neuem Tab öffnen
   el.preview.querySelectorAll("a[href]").forEach(a => {
     a.target = "_blank";
@@ -428,7 +482,8 @@ el.editor.addEventListener("input", () => {
   state.content = el.editor.value;
   state.modified = true;
   clearTimeout(renderTimer);
-  renderTimer = setTimeout(updatePreview, 120);
+  // SwaggerUI-Neuaufbau ist teurer als Markdown → beim Tippen etwas länger warten
+  renderTimer = setTimeout(updatePreview, document.body.classList.contains("view-openapi") ? 400 : 120);
   updateChrome();
 });
 
@@ -495,7 +550,14 @@ document.addEventListener("drop", async e => {
 });
 
 /* ---------- Speichern ---------- */
+function fileType() {
+  if (/\.json$/i.test(state.filename)) return { description: "JSON", mime: "application/json", ext: [".json"] };
+  if (/\.ya?ml$/i.test(state.filename)) return { description: "YAML", mime: "application/yaml", ext: [".yaml", ".yml"] };
+  return { description: "Markdown", mime: "text/markdown", ext: [".md"] };
+}
+
 async function save() {
+  const type = fileType();
   // 1. Bereits bekannter Handle (Datei wurde per Picker/Drop mit Handle geöffnet)
   if (state.fileHandle) {
     try {
@@ -512,7 +574,7 @@ async function save() {
     try {
       const handle = await showSaveFilePicker({
         suggestedName: state.filename,
-        types: [{ description: "Markdown", accept: { "text/markdown": [".md"] } }],
+        types: [{ description: type.description, accept: { [type.mime]: type.ext } }],
       });
       const w = await handle.createWritable();
       await w.write(state.content);
@@ -527,7 +589,7 @@ async function save() {
     }
   }
   // 3. Fallback (Firefox): Download
-  const blob = new Blob([state.content], { type: "text/markdown;charset=utf-8" });
+  const blob = new Blob([state.content], { type: type.mime + ";charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -614,6 +676,11 @@ el.btnTheme.addEventListener("click", () => {
       "Diese Variante rendert Formeln in `$…$` und `$$…$$`, zum Beispiel $\\Delta\\theta \\approx \\lambda / D$ oder",
       "",
       "$$D \\approx \\frac{\\lambda}{\\Delta\\theta} = \\frac{0{,}343\\,\\mathrm{m}}{0{,}175} \\approx 2{,}0\\,\\mathrm{m}.$$",
+    ] : []).concat(hasSwagger ? [
+      "",
+      "## SwaggerUI ist an Bord",
+      "",
+      "Diese Variante zeigt OpenAPI-/Swagger-Spezifikationen (`.yaml`, `.yml`, `.json`) direkt an: Datei öffnen oder hierher ziehen. Im Bearbeiten-Modus aktualisiert sich die Ansicht live.",
     ] : []).join("\n"));
     setMode("read");
   }

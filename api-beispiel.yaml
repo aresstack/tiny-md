@@ -1,0 +1,129 @@
+openapi: 3.0.3
+info:
+  title: Notizen-API (Beispiel)
+  version: 1.0.0
+  description: |
+    Beispiel-Spezifikation für **tiny-md-swagger**: Diese Datei wird mit
+    SwaggerUI angezeigt – komplett offline, aus einer einzigen HTML-Datei.
+
+    Im Bearbeiten-Modus (Strg+E) lässt sich die Spezifikation direkt ändern,
+    die Ansicht aktualisiert sich live.
+servers:
+  - url: http://localhost:8080/api
+    description: lokale Entwicklung
+tags:
+  - name: Notizen
+    description: Markdown-Notizen anlegen, lesen und löschen
+paths:
+  /notizen:
+    get:
+      tags: [Notizen]
+      summary: Alle Notizen auflisten
+      parameters:
+        - name: tag
+          in: query
+          description: nur Notizen mit diesem Schlagwort
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste der Notizen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notiz"
+    post:
+      tags: [Notizen]
+      summary: Neue Notiz anlegen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NeueNotiz"
+      responses:
+        "201":
+          description: Notiz angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notiz"
+        "400":
+          $ref: "#/components/responses/Fehler"
+  /notizen/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags: [Notizen]
+      summary: Eine Notiz lesen
+      responses:
+        "200":
+          description: die Notiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notiz"
+        "404":
+          $ref: "#/components/responses/Fehler"
+    delete:
+      tags: [Notizen]
+      summary: Notiz löschen
+      responses:
+        "204":
+          description: gelöscht
+        "404":
+          $ref: "#/components/responses/Fehler"
+components:
+  schemas:
+    NeueNotiz:
+      type: object
+      required: [titel, inhalt]
+      properties:
+        titel:
+          type: string
+          example: Einkaufsliste
+        inhalt:
+          type: string
+          description: Markdown-Text
+          example: "- Milch\n- Brot"
+        tags:
+          type: array
+          items:
+            type: string
+          example: [privat]
+    Notiz:
+      allOf:
+        - $ref: "#/components/schemas/NeueNotiz"
+        - type: object
+          required: [id, erstellt]
+          properties:
+            id:
+              type: integer
+              format: int64
+              example: 42
+            erstellt:
+              type: string
+              format: date-time
+    Fehler:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 404
+        meldung:
+          type: string
+          example: Notiz nicht gefunden
+  responses:
+    Fehler:
+      description: Fehler
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Fehler"

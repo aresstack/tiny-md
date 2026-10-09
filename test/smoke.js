@@ -143,6 +143,37 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("schlank: Mathe bleibt wörtlich samt Backslashes erhalten",
       ps.textContent.includes("$\\lambda\\,x$"));
   }
+  /* ---------- OpenAPI / SwaggerUI ---------- */
+  check("tiny-md.html enthält kein SwaggerUI", !fs.readFileSync(path.join(__dirname, "..", "dist", "tiny-md.html"), "utf8").includes(".swagger-ui "));
+  check("tiny-md-swagger.html enthält SwaggerUI", distSize("tiny-md-swagger.html") > 1_000_000);
+  {
+    const wa = loadApp("api-beispiel.html");
+    await new Promise(r => setTimeout(r, 1500)); // SwaggerUI parst/resolvt asynchron
+    const sw = wa.document.getElementById("swagger");
+    check("openapi: Swagger-Ansicht aktiv", wa.document.body.classList.contains("view-openapi"));
+    const title = sw.querySelector(".info .title");
+    check("openapi: Titel aus Spezifikation gerendert", title && title.textContent.includes("Notizen-API"),
+      sw.textContent.slice(0, 200));
+    check("openapi: alle 4 Operationen gerendert", sw.querySelectorAll(".opblock").length === 4,
+      sw.querySelectorAll(".opblock").length);
+    check("openapi: Dateiname angezeigt", wa.document.getElementById("file-label").textContent.includes("api-beispiel.yaml"));
+
+    // Live-Bearbeitung: Titel im Editor ändern → SwaggerUI aktualisiert sich
+    const ed = wa.document.getElementById("editor");
+    ed.value = ed.value.replace("Notizen-API (Beispiel)", "Geänderte API");
+    ed.dispatchEvent(new wa.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1500));
+    const t2 = sw.querySelector(".info .title");
+    check("openapi: Live-Update nach Bearbeitung", t2 && t2.textContent.includes("Geänderte API"));
+  }
+  {
+    // Ohne SwaggerUI: Spezifikation als Codeblock mit Hinweis statt kaputtem Markdown
+    const wp = loadApp("api-ohne-swagger.html");
+    const pp = wp.document.getElementById("preview");
+    check("ohne swagger: YAML als Codeblock", pp.querySelector("pre code.language-yaml") !== null);
+    check("ohne swagger: Hinweis auf Swagger-Variante", pp.textContent.includes("tiny-md-swagger.html"));
+  }
+
   check("tiny-md-katex.html enthält KaTeX + Fonts", distSize("tiny-md-katex.html") > 500_000);
   check("tiny-md-full.html enthält Mermaid + KaTeX", distSize("tiny-md-full.html") > 4_000_000);
 
