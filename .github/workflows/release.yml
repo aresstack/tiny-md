@@ -33,8 +33,10 @@ jobs:
             dist/tiny-md.html \
             dist/tiny-md-mermaid.html \
             dist/tiny-md-full.html \
+            dist/tiny-md-swagger.html \
             dist/beispiel.html \
             dist/diagramme.html \
+            dist/api-beispiel.html \
             --target "$GITHUB_SHA" \
             --title "tiny-md $VERSION" \
             --notes "Offline-fähiger Markdown-Viewer/-Editor als einzelne HTML-Datei.
@@ -42,8 +44,10 @@ jobs:
           - **tiny-md.html** – leere App (~90 kB): öffnet, rendert, bearbeitet und speichert .md-Dateien
           - **tiny-md-mermaid.html** – wie oben, zusätzlich mit Mermaid-Diagramm-Rendering (~3,5 MB)
           - **tiny-md-full.html** – Mermaid und KaTeX-Formel-Rendering (~4,3 MB)
+          - **tiny-md-swagger.html** – mit SwaggerUI: öffnet OpenAPI-/Swagger-Spezifikationen (.yaml/.yml/.json) und zeigt sie direkt an (~1,8 MB)
           - **beispiel.html** – App mit eingebettetem Beispieldokument inkl. Mermaid-Diagramm
           - **diagramme.html** – Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph
+          - **api-beispiel.html** – Swagger-Variante mit eingebetteter Beispiel-OpenAPI-Spezifikation
 
           Build aus ${{ github.sha }}" \
             --latest
