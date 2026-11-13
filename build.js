@@ -103,16 +103,19 @@ async function drawioJs() {
   const sha256 = b => require("crypto").createHash("sha256").update(b).digest("hex");
   const viewer = path.join(drawioDir, "viewer-static.min.js");
   const license = path.join(drawioDir, "LICENSE");
-  if (!fs.existsSync(viewer) || sha256(fs.readFileSync(viewer)) !== DRAWIO_SHA256) {
-    fs.mkdirSync(drawioDir, { recursive: true });
+  if (!fs.existsSync(license) || !fs.existsSync(viewer) || sha256(fs.readFileSync(viewer)) !== DRAWIO_SHA256) {
+    // Erst beide Dateien laden und prüfen, dann ablegen: ein halber Cache entsteht nie.
+    const loaded = [];
     for (const [file, target] of [["src/main/webapp/js/viewer-static.min.js", viewer], ["LICENSE", license]]) {
       const res = await fetch(drawioBase + file);
       if (!res.ok) throw new Error(`draw.io: ${file} nicht ladbar (HTTP ${res.status})`);
-      fs.writeFileSync(target, Buffer.from(await res.arrayBuffer()));
+      loaded.push([target, Buffer.from(await res.arrayBuffer())]);
     }
-    if (sha256(fs.readFileSync(viewer)) !== DRAWIO_SHA256) {
-      throw new Error("draw.io: Prüfsumme von viewer-static.min.js stimmt nicht – Datei gelöscht");
+    if (sha256(loaded[0][1]) !== DRAWIO_SHA256) {
+      throw new Error("draw.io: Prüfsumme von viewer-static.min.js stimmt nicht");
     }
+    fs.mkdirSync(drawioDir, { recursive: true });
+    for (const [target, bytes] of loaded) fs.writeFileSync(target, bytes);
   }
   const comment = s => "/*!\n * draw.io-Viewer " + DRAWIO_VERSION + " – https://github.com/jgraph/drawio\n"
     + " * Copyright (c) JGraph Ltd, Apache License 2.0:\n" + s.replace(/\*\//g, "* /") + "\n*/\n";

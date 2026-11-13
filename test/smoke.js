@@ -317,6 +317,25 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     }
     check("draw.io offline: keine Viewer-Standardadressen aktiv",
       read("tiny-md-drawio.html").includes('window.mxBasePath = "tiny-md-offline"'));
+    // Was der Viewer bekommt: Aufruf abfangen (jsdom kann nicht zeichnen)
+    const wx = loadApp("tiny-md-drawio.html");
+    const seen = [];
+    wx.GraphViewer.createViewerForElement = div => seen.push(JSON.parse(div.getAttribute("data-mxgraph")).xml);
+    const edx = wx.document.getElementById("editor");
+    edx.value = "```drawio\n" + '<?xml version="1.0"?><!-- k --><mxGraphModel><root><mxCell id="0"/>'
+      + '<mxCell id="2" style="shape=image;image=https://example.com/p.png;fontSource=https%3A%2F%2Ffonts.example%2Fx;rounded=1" vertex="1"/>'
+      + '<mxCell id="3" style="shape=image;image=data:image/png,AAAA" vertex="1"/>'
+      + '<mxCell id="4" value="&lt;img src=&quot;https://example.com/l.png&quot;&gt;Text" vertex="1"/>'
+      + "</root></mxGraphModel>\n```\n\n```drawio\n<svg/>\n```";
+    edx.dispatchEvent(new wx.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const x = seen[0] || "";
+    check("drawio: XML-Deklaration und Kommentar akzeptiert, Nicht-Diagramm bleibt Code",
+      seen.length === 1 && wx.document.querySelectorAll("#preview code.language-drawio").length === 1, seen.length);
+    check("drawio: Fernbild und Fernschrift entfernt, Rest bleibt", !x.includes("example.com/p.png")
+      && !x.includes("fonts.example") && x.includes("rounded=1"), x);
+    check("drawio: data:-Bild bleibt", x.includes("image=data:image/png,AAAA"), x);
+    check("drawio: Fernbild in HTML-Beschriftung entfernt", !x.includes("example.com/l.png") && x.includes("Text"), x);
     const wd = loadApp("tiny-md-drawio.html");
     const pd = wd.document.getElementById("preview");
     check("drawio-variante: App startet mit Beispieldiagramm",

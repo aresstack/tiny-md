@@ -397,11 +397,52 @@ async function renderMermaidIn(container) {
    gezeichnet; ungültige bleiben als Codeblock stehen. */
 const hasDrawio = typeof GraphViewer !== "undefined";
 
+/* Das Diagramm-XML für den Viewer, ohne alles, was beim Anzeigen nachladen würde:
+   Bilder (style image=…), Schriften (fontSource=…), Hintergrundbilder und
+   Fernbilder in HTML-Beschriftungen. Komprimierte Seiten werden dafür entpackt.
+   Kein Diagramm-XML → null (der Codeblock bleibt stehen). */
+const isRemote = v => !/^\s*data:/i.test(v) && v.includes("//");
+function offlineDrawioXml(text) {
+  const doc = new DOMParser().parseFromString(text.trim(), "text/xml");
+  const root = doc.documentElement;
+  if (doc.getElementsByTagName("parsererror").length || !/^(mxfile|mxGraphModel)$/.test(root.nodeName)) return null;
+  for (const page of Array.from(doc.getElementsByTagName("diagram"))) {
+    if (page.getElementsByTagName("mxGraphModel").length || !page.textContent.trim()) continue;
+    let model;
+    try {
+      model = new DOMParser().parseFromString(Graph.decompress(page.textContent.trim()), "text/xml").documentElement;
+    } catch (_) { return null; }
+    if (!model || model.nodeName !== "mxGraphModel") return null;
+    page.textContent = "";
+    page.appendChild(doc.importNode(model, true));
+  }
+  for (const node of Array.from(doc.getElementsByTagName("*"))) {
+    for (const attr of Array.from(node.attributes)) {
+      const v = attr.value;
+      if (attr.name === "style") {
+        node.setAttribute("style", v.split(";").filter(entry => {
+          const eq = entry.indexOf("=");
+          return eq < 0 || !/^(image|fontSource|imageBackground|backgroundImage)$/i.test(entry.slice(0, eq))
+            || !isRemote(decodeURIComponentSafe(entry.slice(eq + 1)));
+        }).join(";"));
+      } else if (/^backgroundImage$/i.test(attr.name) && isRemote(v)) {
+        node.removeAttribute(attr.name);
+      } else if (v.includes("<")) {
+        node.setAttribute(attr.name, DOMPurify.sanitize(v)); // HTML-Beschriftung: gleiche Regeln wie im Markdown
+      }
+    }
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+function decodeURIComponentSafe(v) {
+  try { return decodeURIComponent(v); } catch (_) { return v; }
+}
+
 function renderDrawioIn(container) {
   if (!hasDrawio) return;
   for (const code of container.querySelectorAll("pre > code.language-drawio")) {
-    const xml = code.textContent.trim();
-    if (!/^<(mxfile|mxGraphModel)\b/.test(xml)) continue;
+    const xml = offlineDrawioXml(code.textContent);
+    if (!xml) continue;
     const div = document.createElement("div");
     div.className = "drawio-diagram mxgraph";
     div.setAttribute("data-mxgraph", JSON.stringify({
