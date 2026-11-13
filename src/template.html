@@ -533,6 +533,9 @@ const state = {
   modified: false,
   fileHandle: null,   // File System Access API (Edge/Chrome), sonst null
   embedded: false,
+  folderFind: null, // Nachschlagen im freigegebenen Ordner, für beim Bearbeiten neue Ziele
+  folderTried: null,
+  folderNote: null, // Hinweis zum freigegebenen Ordner (liest noch, Bilder nicht gefunden)
   docSerial: 0, // zählt geöffnete Dokumente; späte Ordnerergebnisse eines Vorgängers werden verworfen
   // Dateien neben dem Dokument (aus ZIP oder abgelegtem Ordner): Pfad → () => Promise<Blob>
   resources: null,
@@ -566,6 +569,7 @@ function updatePreview() {
     a.rel = "noopener noreferrer";
   });
   resolveResources(el.preview);
+  if (state.folderFind) resolveNewTargets();
   updateFolderHint();
   renderDrawioIn(el.preview);
   renderMermaidIn(el.preview);
@@ -618,39 +622,155 @@ function relativeImageCount() {
 }
 
 function updateFolderHint() {
-  const count = state.resources || state.embedded ? 0 : relativeImageCount();
+  const note = state.folderNote;
+  const count = note || state.resources || state.embedded ? 0 : relativeImageCount();
   const hint = document.getElementById("folder-hint");
-  hint.classList.toggle("visible", count > 0);
-  if (count > 0) {
+  hint.classList.toggle("visible", Boolean(note) || count > 0);
+  document.getElementById("btn-folder").disabled = note === BUSY;
+  if (note) {
+    document.getElementById("folder-hint-text").textContent = note;
+  } else if (count > 0) {
     document.getElementById("folder-hint-text").textContent = (count === 1 ? "1 Bild liegt" : count + " Bilder liegen")
-      + " neben der Datei. Der Browser darf diesen Ordner erst lesen, wenn du ihn freigibst – oder öffne gleich das ZIP.";
+      + " neben der Datei. Der Browser darf den Ordner erst lesen, wenn du ihn freigibst: wähle den Ordner, in dem „"
+      + state.filename + "“ liegt – oder öffne gleich das ZIP.";
   }
 }
 
-// Alle Dateien eines Ordners (File System Access API), Pfade relativ zum Ordner
-async function readDirectoryHandle(dir, prefix, files) {
-  for await (const [name, handle] of dir.entries()) {
-    if (handle.kind === "file") files.set(prefix + name, () => handle.getFile());
-    else await readDirectoryHandle(handle, prefix + name + "/", files);
+const BUSY = "Ordner wird gelesen …";
+
+// Relative Bild- und Linkziele der Vorschau, als Pfade relativ zum Dokument
+function neededPaths() {
+  const paths = new Set();
+  for (const [node, attr] of [...el.preview.querySelectorAll("img[src]")].map(n => [n, "src"])
+    .concat([...el.preview.querySelectorAll("a[href]")].map(n => [n, "href"]))) {
+    const path = resourcePath(node.getAttribute(attr));
+    if (path) paths.add(path);
   }
-  return files;
+  return [...paths];
 }
 
-// Wo liegt das Dokument im freigegebenen Ordner? Ordner der gleichnamigen Datei, die flachste zuerst
-function baseDirFor(paths) {
-  const own = paths.filter(p => p.split("/").pop() === state.filename)
+/* Ordner über die File System Access API: Pfade direkt über den Ordner auflösen,
+   ohne ihn ganz aufzuzählen (auch wenn „Downloads“ samt allem gewählt wurde).
+   Gewählt sein darf der Ordner des Dokuments, einer bis zwei Ebenen darüber
+   (die flachste gleichnamige Datei gilt) oder der Bilderordner selbst. */
+async function fileAt(dir, segments) {
+  let current = dir;
+  for (const name of segments.slice(0, -1)) current = await current.getDirectoryHandle(name);
+  return current.getFileHandle(segments[segments.length - 1]);
+}
+
+// Wo liegt das Dokument im gewählten Ordner? Ebene für Ebene, die flachste zuerst; null, wenn nicht darin
+async function documentPath(dir) {
+  let level = [[dir, []]];
+  for (let depth = 0; depth <= 2 && level.length; depth++) {
+    const next = [];
+    for (const [current, segments] of level) {
+      try { await current.getFileHandle(state.filename); return segments; } catch (_) { /* nicht hier */ }
+      if (depth === 2) continue;
+      for await (const [name, handle] of current.entries()) {
+        if (handle.kind === "directory" && !name.startsWith(".") && name !== "node_modules") {
+          next.push([handle, segments.concat(name)]);
+        }
+      }
+    }
+    level = next;
+  }
+  return null;
+}
+
+/* Kandidaten für einen Pfad: der Pfad selbst; liegt das Dokument nicht im
+   gewählten Ordner und heißt dieser wie ein Teil des Pfads (z. B. „assets“),
+   zusätzlich der Rest dahinter. Nie bloß der Dateiname. */
+function candidates(path, documentFound, folderName) {
+  const segments = path.split("/").filter(Boolean);
+  const result = [segments];
+  if (!documentFound && folderName) {
+    segments.forEach((name, i) => {
+      if (name === folderName && i + 1 < segments.length) result.push(segments.slice(i + 1));
+    });
+  }
+  return result;
+}
+
+async function handleLookup(dir) {
+  const location = await documentPath(dir);
+  return {
+    base: location ? location.map(name => name + "/").join("") : "",
+    find: async path => {
+      for (const segments of candidates(path, location !== null, dir.name)) {
+        try {
+          const file = await fileAt(dir, segments);
+          return () => file.getFile();
+        } catch (_) { /* nächster Kandidat */ }
+      }
+      return null;
+    },
+  };
+}
+
+// Ordner über <input webkitdirectory> (Firefox): alle Dateien liegen schon als Liste vor
+function listLookup(files, folderName) {
+  const own = [...files.keys()].filter(p => p.split("/").pop() === state.filename)
     .sort((a, b) => a.split("/").length - b.split("/").length)[0];
-  return own ? own.slice(0, own.lastIndexOf("/") + 1) : "";
+  return {
+    base: own ? own.slice(0, own.lastIndexOf("/") + 1) : "",
+    find: async path => {
+      for (const segments of candidates(path, own !== undefined, folderName)) {
+        const key = segments.join("/");
+        if (files.has(key)) return files.get(key);
+      }
+      return null;
+    },
+  };
 }
 
-function useFolder(files, serial) {
-  if (serial !== undefined && serial !== state.docSerial) return; // inzwischen anderes Dokument geöffnet
+function folderResource(path, open) {
+  return () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) }));
+}
+
+async function useFolder(lookup, serial, name) {
+  if (serial !== state.docSerial) return; // inzwischen anderes Dokument geöffnet
+  state.folderNote = BUSY;
+  updateFolderHint();
   const resources = new Map();
-  for (const [path, open] of files) {
-    resources.set(path, () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) })));
+  let found = null;
+  try {
+    found = await lookup();
+    if (serial !== state.docSerial) return;
+    state.baseDir = found.base; // relative Ziele gelten ab dem Ordner des Dokuments, auch „../“
+    for (const path of neededPaths()) {
+      const open = await found.find(path);
+      if (serial !== state.docSerial) return;
+      if (open) resources.set(path, folderResource(path, open));
+    }
+  } catch (_) {
+    if (serial !== state.docSerial) return;
   }
-  setResources(resources, baseDirFor([...files.keys()]));
+  state.folderNote = resources.size > 0 ? null
+    : "Im Ordner „" + name + "“ liegen die Bilder nicht. Wähle den Ordner, in dem „" + state.filename
+      + "“ liegt (mit dem Unterordner der Bilder) – oder öffne gleich das ZIP.";
+  setResources(resources.size ? resources : null, found ? found.base : "");
+  if (resources.size) {
+    state.folderFind = found.find; // beim Bearbeiten neu hinzugekommene Ziele ebenfalls aus dem Ordner
+    state.folderTried = new Set(neededPaths());
+  }
   updatePreview();
+}
+
+// Nach dem Bearbeiten: Ziele, die noch nicht im Ordner gesucht wurden, nachschlagen
+async function resolveNewTargets() {
+  const serial = state.docSerial;
+  const find = state.folderFind;
+  const missing = neededPaths().filter(p => !state.resources.has(p) && !state.folderTried.has(p));
+  if (!missing.length) return;
+  missing.forEach(p => state.folderTried.add(p));
+  let added = false;
+  for (const path of missing) {
+    const open = await find(path).catch(() => null);
+    if (serial !== state.docSerial || find !== state.folderFind) return;
+    if (open) { state.resources.set(path, folderResource(path, open)); added = true; }
+  }
+  if (added) resolveResources(el.preview);
 }
 
 async function shareFolder() {
@@ -663,7 +783,7 @@ async function shareFolder() {
       if (err && err.name === "AbortError") return;
       try { dir = await showDirectoryPicker(); } catch (_) { return; }
     }
-    useFolder(await readDirectoryHandle(dir, "", new Map()), serial);
+    await useFolder(() => handleLookup(dir), serial, dir.name);
     return;
   }
   folderSerial = serial;
@@ -674,13 +794,15 @@ let folderSerial;
 document.getElementById("btn-folder").addEventListener("click", shareFolder);
 document.getElementById("folder-input").addEventListener("change", e => {
   const files = new Map();
+  let name = "";
   for (const f of e.target.files) {
     // webkitRelativePath beginnt mit dem Namen des gewählten Ordners
-    const rel = (f.webkitRelativePath || f.name).split("/").slice(1).join("/") || f.name;
-    files.set(rel, () => f);
+    const parts = (f.webkitRelativePath || f.name).split("/");
+    name = name || (parts.length > 1 ? parts[0] : "");
+    files.set(parts.slice(1).join("/") || f.name, () => f);
   }
   e.target.value = "";
-  if (files.size) useFolder(files, folderSerial);
+  if (files.size) useFolder(async () => listLookup(files, name), folderSerial, name);
 });
 
 function setResources(resources, baseDir) {
@@ -688,6 +810,8 @@ function setResources(resources, baseDir) {
   blobUrls.clear();
   state.resources = resources;
   state.baseDir = baseDir || "";
+  state.folderFind = null;
+  state.folderTried = null;
 }
 
 const MIME = {
@@ -833,6 +957,7 @@ function setDocument(filename, content, opts) {
   state.modified = false;
   state.fileHandle = (opts && opts.fileHandle) || null;
   state.embedded = !!(opts && opts.embedded);
+  state.folderNote = null;
   state.docSerial++;
   if (!(opts && opts.keepResources)) setResources(null, "");
   el.editor.value = content;
