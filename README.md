@@ -30,7 +30,7 @@ Datei herunterladen, doppelklicken, fertig.
 
 - **Lesen:** eingebettetes Markdown wird beim Öffnen sofort sauber gerendert (GFM: Tabellen, Task-Listen, Codeblöcke), hell/dunkel, druckbar
 - **Öffnen:** `.md`-Datei per Button (Strg+O) oder Drag & Drop
-- **Markdown mit Bilderordner** (z. B. das Markdown-Paket von Space Harvester): das **ZIP direkt öffnen** (Button oder Drag & Drop) oder den **entpackten Ordner** ins Fenster ziehen. tiny-md nimmt `pages.md` (sonst die oberste `.md`-Datei) und zeigt relative Bilder (`assets/…png`) und verlinkte Dateien (`attachments/…`) aus dem ZIP bzw. Ordner an – ohne Entpacken, ohne Netzwerk. Eine einzeln geöffnete `.md`-Datei kann das nicht: der Browser verrät den Ordner der Datei nicht, relative Pfade gelten dann relativ zur `tiny-md.html`
+- **Markdown mit Bilderordner** (z. B. das Markdown-Paket von Space Harvester): das **ZIP direkt öffnen** (Button oder Drag & Drop) oder den **entpackten Ordner** ins Fenster ziehen. tiny-md nimmt `pages.md` (sonst die oberste `.md`-Datei) und zeigt relative Bilder (`assets/…png`) und verlinkte Dateien (`attachments/…`) aus dem ZIP bzw. Ordner an – ohne Entpacken, ohne Netzwerk. Bei einer einzeln geöffneten `.md`-Datei verrät der Browser ihren Ordner nicht; enthält sie relative Bilder, erscheint oben der Hinweis **„Ordner freigeben …“** – Ordner auswählen, dann erscheinen die Bilder ebenso
 - **Bearbeiten:** Split-Ansicht Editor/Vorschau (Strg+E), Live-Rendering
 - **Speichern** (Strg+S):
   - Edge/Chrome: direkt zurück in die Originaldatei (File System Access API)

@@ -231,11 +231,59 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("ordner: Bild zeigt auf Datei im Ordner", (po.querySelector('img[alt="Bild"]') || {}).src === "blob:null/1",
       po.innerHTML.slice(0, 400));
 
+    // Einzelne .md mit relativen Bildern: Hinweis „Ordner freigeben“, danach Bilder aus dem Ordner
+    const wh = withBlobs(loadApp("tiny-md.html"));
+    drop(wh, new wh.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    const hint = wh.document.getElementById("folder-hint");
+    check("einzeln: Hinweis Ordner freigeben sichtbar", hint.classList.contains("visible")
+      && /2 Bilder liegen neben der Datei/.test(hint.textContent), hint.textContent);
+    const folderInput = wh.document.getElementById("folder-input");
+    Object.defineProperty(folderInput, "files", { configurable: true, value: [
+      Object.assign(new wh.File([md], "pages.md"), { webkitRelativePath: "MoeVe/pages.md" }),
+      Object.defineProperty(new wh.File(["PNG"], "a b.png"), "webkitRelativePath", { value: "MoeVe/assets/a b.png" }),
+    ] });
+    folderInput.dispatchEvent(new wh.Event("change"));
+    await new Promise(r => setTimeout(r, 200));
+    check("einzeln: nach Freigabe Bild aus dem Ordner",
+      (wh.document.querySelector('#preview img[alt="Bild"]') || {}).src === "blob:null/1"
+      && !hint.classList.contains("visible"), wh.document.getElementById("preview").innerHTML.slice(0, 300));
+
     // Danach eine einzelne .md: keine Dateien des Pakets mehr
     drop(wo, new wo.File([md], "einzeln.md"), { kind: "file" });
     await new Promise(r => setTimeout(r, 200));
     check("einzeln: relative Pfade bleiben, wie sie sind",
       wo.document.querySelector('#preview img[alt="Bild"]').getAttribute("src") === "assets/a%20b.png");
+
+    // Viewer mit eingebettetem Dokument: danach geöffnete .md bekommt den Hinweis trotzdem
+    const we = withBlobs(loadApp("beispiel.html"));
+    drop(we, new we.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    check("eingebettet: Hinweis Ordner freigeben für später geöffnete .md",
+      we.document.getElementById("folder-hint").classList.contains("visible"));
+
+    // Ordner wird noch gelesen, inzwischen ein anderes Dokument geöffnet → Ergebnis verwerfen
+    const ws2 = withBlobs(loadApp("tiny-md.html"));
+    drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    let release;
+    const gate = new Promise(r => { release = r; });
+    ws2.showDirectoryPicker = async () => ({ async *entries() {
+      await gate;
+      yield ["pages.md", { kind: "file", getFile: async () => new ws2.File([md], "pages.md") }];
+      yield ["assets", { kind: "directory", async *entries() {
+        yield ["a b.png", { kind: "file", getFile: async () => new ws2.File(["PNG"], "a b.png") }];
+      } }];
+    } });
+    ws2.document.getElementById("btn-folder").click();
+    await new Promise(r => setTimeout(r, 50));
+    drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    release();
+    await new Promise(r => setTimeout(r, 200));
+    check("einzeln: später fertiger Ordner gilt nicht für das neue Dokument",
+      ws2.document.querySelector('#preview img[alt="Bild"]').getAttribute("src") === "assets/a%20b.png"
+      && ws2.document.getElementById("folder-hint").classList.contains("visible"));
   }
 
   /* ---------- Mathe: Roundtrip über den Editor-Eingabepfad ---------- */

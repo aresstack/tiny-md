@@ -73,6 +73,33 @@ body.mode-edit #editor-pane { display: flex; }
   overflow-y: auto;
 }
 
+/* Hinweis: Bilder liegen neben einer einzeln geöffneten Datei */
+#folder-hint {
+  display: none;
+  max-width: 46rem;
+  margin: 16px auto 0;
+  padding: 10px 14px;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--fg-muted);
+  font-size: 0.9em;
+}
+#folder-hint.visible { display: flex; }
+#folder-hint span { flex: 1; }
+#folder-hint button {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+@media print { #folder-hint { display: none !important; } }
+
 /* ---------- Markdown-Typografie ---------- */
 .md-body {
   max-width: 46rem;
@@ -236,6 +263,10 @@ body.dragging #drop-overlay { display: flex; }
     <textarea id="editor" spellcheck="false" placeholder="# Markdown hier eingeben …"></textarea>
   </section>
   <section id="preview-pane">
+    <div id="folder-hint" role="status">
+      <span id="folder-hint-text"></span>
+      <button id="btn-folder" type="button">Ordner freigeben …</button>
+    </div>
     <article id="preview" class="md-body"></article>
     <div id="swagger"></div>
   </section>
@@ -265,6 +296,7 @@ body.dragging #drop-overlay { display: flex; }
 
 <div id="drop-overlay">Datei hier ablegen</div>
 <input type="file" id="file-input" accept=".md,.markdown,.mdown,.txt,.yaml,.yml,.json,.zip" hidden>
+<input type="file" id="folder-input" webkitdirectory hidden>
 
 <!-- Eingebettetes Dokument: wird vom Build-Skript befüllt. Leer = App startet ohne Dokument. -->
 <script type="text/markdown" id="embedded-md" data-filename="__EMBEDDED_FILENAME__">__EMBEDDED_MD__</script>
@@ -501,6 +533,7 @@ const state = {
   modified: false,
   fileHandle: null,   // File System Access API (Edge/Chrome), sonst null
   embedded: false,
+  docSerial: 0, // zählt geöffnete Dokumente; späte Ordnerergebnisse eines Vorgängers werden verworfen
   // Dateien neben dem Dokument (aus ZIP oder abgelegtem Ordner): Pfad → () => Promise<Blob>
   resources: null,
   baseDir: "",        // Ordner des Dokuments innerhalb von ZIP/Ordner, z. B. "export/"
@@ -533,6 +566,7 @@ function updatePreview() {
     a.rel = "noopener noreferrer";
   });
   resolveResources(el.preview);
+  updateFolderHint();
   renderDrawioIn(el.preview);
   renderMermaidIn(el.preview);
 }
@@ -574,6 +608,80 @@ function resolveResources(container) {
     resourceUrl(path).then(url => node.setAttribute(attr, url + fragment), () => {});
   }
 }
+
+/* Einzeln geöffnete .md mit relativen Bildern: der Browser kennt ihren Ordner
+   nicht. Ein Hinweis bietet an, den Ordner freizugeben; danach werden Bilder
+   und verlinkte Dateien daraus angezeigt wie bei einem geöffneten ZIP. */
+function relativeImageCount() {
+  return [...el.preview.querySelectorAll("img[src]")]
+    .filter(img => resourcePath(img.getAttribute("src")) !== null).length;
+}
+
+function updateFolderHint() {
+  const count = state.resources || state.embedded ? 0 : relativeImageCount();
+  const hint = document.getElementById("folder-hint");
+  hint.classList.toggle("visible", count > 0);
+  if (count > 0) {
+    document.getElementById("folder-hint-text").textContent = (count === 1 ? "1 Bild liegt" : count + " Bilder liegen")
+      + " neben der Datei. Der Browser darf diesen Ordner erst lesen, wenn du ihn freigibst – oder öffne gleich das ZIP.";
+  }
+}
+
+// Alle Dateien eines Ordners (File System Access API), Pfade relativ zum Ordner
+async function readDirectoryHandle(dir, prefix, files) {
+  for await (const [name, handle] of dir.entries()) {
+    if (handle.kind === "file") files.set(prefix + name, () => handle.getFile());
+    else await readDirectoryHandle(handle, prefix + name + "/", files);
+  }
+  return files;
+}
+
+// Wo liegt das Dokument im freigegebenen Ordner? Ordner der gleichnamigen Datei, die flachste zuerst
+function baseDirFor(paths) {
+  const own = paths.filter(p => p.split("/").pop() === state.filename)
+    .sort((a, b) => a.split("/").length - b.split("/").length)[0];
+  return own ? own.slice(0, own.lastIndexOf("/") + 1) : "";
+}
+
+function useFolder(files, serial) {
+  if (serial !== undefined && serial !== state.docSerial) return; // inzwischen anderes Dokument geöffnet
+  const resources = new Map();
+  for (const [path, open] of files) {
+    resources.set(path, () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) })));
+  }
+  setResources(resources, baseDirFor([...files.keys()]));
+  updatePreview();
+}
+
+async function shareFolder() {
+  const serial = state.docSerial;
+  if (window.showDirectoryPicker) {
+    let dir;
+    try {
+      dir = await showDirectoryPicker({ id: "tiny-md-bilder", startIn: state.fileHandle || "documents" });
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      try { dir = await showDirectoryPicker(); } catch (_) { return; }
+    }
+    useFolder(await readDirectoryHandle(dir, "", new Map()), serial);
+    return;
+  }
+  folderSerial = serial;
+  document.getElementById("folder-input").click(); // Firefox: Ordnerauswahl über <input webkitdirectory>
+}
+
+let folderSerial;
+document.getElementById("btn-folder").addEventListener("click", shareFolder);
+document.getElementById("folder-input").addEventListener("change", e => {
+  const files = new Map();
+  for (const f of e.target.files) {
+    // webkitRelativePath beginnt mit dem Namen des gewählten Ordners
+    const rel = (f.webkitRelativePath || f.name).split("/").slice(1).join("/") || f.name;
+    files.set(rel, () => f);
+  }
+  e.target.value = "";
+  if (files.size) useFolder(files, folderSerial);
+});
 
 function setResources(resources, baseDir) {
   for (const url of blobUrls.values()) url.then(u => URL.revokeObjectURL(u), () => {});
@@ -724,6 +832,8 @@ function setDocument(filename, content, opts) {
   state.content = content;
   state.modified = false;
   state.fileHandle = (opts && opts.fileHandle) || null;
+  state.embedded = !!(opts && opts.embedded);
+  state.docSerial++;
   if (!(opts && opts.keepResources)) setResources(null, "");
   el.editor.value = content;
   updatePreview();
@@ -905,8 +1015,7 @@ el.btnTheme.addEventListener("click", () => {
   const embeddedName = embed.dataset.filename;
 
   if (embeddedText && embeddedName !== "__EMBEDDED" + "_FILENAME__") {
-    state.embedded = true;
-    setDocument(embeddedName || "dokument.md", embeddedText);
+    setDocument(embeddedName || "dokument.md", embeddedText, { embedded: true });
     setMode("read");
   } else {
     setDocument("dokument.md", [
