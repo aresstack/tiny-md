@@ -13,7 +13,8 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 | `tiny-md.html` | die leere App (~90 kB): öffnet, rendert, bearbeitet und speichert `.md`-Dateien |
 | `tiny-md-mermaid.html` | wie oben, zusätzlich mit [Mermaid](https://mermaid.js.org/)-Diagramm-Rendering (~3,5 MB) |
 | `tiny-md-full-mit.html` | **volles MIT-Bundle:** alle MIT-lizenzierten Plugins – [Mermaid](https://mermaid.js.org/) **und** [KaTeX](https://katex.org/)-Formel-Rendering (~4,3 MB) |
-| `tiny-md-full-apache.html` ¹ | **volles Apache-Bundle:** alles aus dem MIT-Bundle plus alle Apache-2.0-Plugins – derzeit [SwaggerUI](https://swagger.io/tools/swagger-ui/) (~6 MB) |
+| `tiny-md-full-apache.html` ¹ ² | **volles Apache-Bundle:** alles aus dem MIT-Bundle plus alle Apache-2.0-Plugins – derzeit [SwaggerUI](https://swagger.io/tools/swagger-ui/) und der [draw.io](https://www.drawio.com/)-Viewer (~11 MB) |
+| `tiny-md-drawio.html` ² | mit dem [draw.io](https://www.drawio.com/)-Viewer: zeichnet ` ```drawio `-Codeblöcke offline (~5 MB) |
 | `beispiel.html` | App mit fest eingebettetem Beispieldokument inkl. Mermaid-Diagramm |
 | `diagramme.html` | Mermaid-Schaufenster: Mindmap, Flowchart, Sequenz, Pie, Gantt, State, Timeline, Git-Graph |
 | `tiny-md-swagger.html` ¹ | mit [SwaggerUI](https://swagger.io/tools/swagger-ui/): öffnet OpenAPI-/Swagger-Spezifikationen (`.yaml`/`.yml`/`.json`) und zeigt sie direkt an (~1,8 MB) |
@@ -21,6 +22,7 @@ Die fertige HTML muss nicht selbst gebaut werden – jeder Push auf `main` erzeu
 | `LICENSE-Apache-2.0-SwaggerUI.txt`, `NOTICE-SwaggerUI.txt`, `LICENSE-MIT-tiny-md.txt` | Lizenztexte zum Beilegen bei Weitergabe |
 
 ¹ enthält SwaggerUI unter Apache-2.0, siehe [Lizenz](#lizenz).
+² enthält den draw.io-Viewer unter Apache-2.0, siehe [Lizenz](#lizenz).
 
 Datei herunterladen, doppelklicken, fertig.
 
@@ -38,6 +40,7 @@ Datei herunterladen, doppelklicken, fertig.
 - Fremde Inhalte werden mit DOMPurify bereinigt (kein Script-Injection über geöffnete/eingebettete Dateien)
 - **Mermaid-Diagramme** (optional): ` ```mermaid `-Codeblöcke werden als SVG gerendert (`securityLevel: strict`, Theme folgt hell/dunkel); ungültige Diagramme bleiben als Codeblock stehen
 - **LaTeX-Formeln** (optional): `$…$` und `$$…$$` werden mit [KaTeX](https://katex.org/) gerendert (Schriften eingebettet, unbekannte Makros erscheinen als roter Fehlertext statt das Dokument zu brechen). Ein eigener Tokenizer schützt Formeln vor der Markdown-Escape-Verarbeitung — `\,`, `\{` & Co. bleiben auch **ohne** KaTeX-Variante unzerstört. Dollar-Beträge (`$5 und $10`) bleiben normaler Text; falls die Heuristik doch anspringt: `\$` schreiben oder `--no-katex` bauen
+- **draw.io-Diagramme** (optional, `tiny-md-drawio.html` und Apache-Bundle): ` ```drawio `-Codeblöcke mit dem Diagramm-XML (`<mxfile>` oder `<mxGraphModel>`, in draw.io unter *Extras › Diagramm bearbeiten*) werden mit dem offiziellen draw.io-Viewer gezeichnet – mit Seiten, Zoom und Ebenen. Offline: Stile, Formen und Bilder werden nicht von viewer.diagrams.net nachgeladen; Formen aus Zusatzbibliotheken, die der Viewer nur online kennt, fehlen daher. Ungültiges XML bleibt als Codeblock stehen
 - **OpenAPI/Swagger** (optional, `tiny-md-swagger.html`): `.yaml`-, `.yml`- oder `.json`-Dateien mit `openapi:`/`swagger:`-Versionsangabe werden per Öffnen oder Drag & Drop mit [SwaggerUI](https://swagger.io/tools/swagger-ui/) angezeigt (OpenAPI 2.0/3.x). Im Bearbeiten-Modus aktualisiert sich die Ansicht live, Speichern schreibt die YAML/JSON-Datei zurück. Hell/Dunkel wird übernommen. In den übrigen Varianten erscheint eine Spezifikation als Codeblock mit Hinweis auf die Swagger-Variante. Hinweis: SwaggerUI rendert Beschreibungen selbst – der „nach Hause telefonieren"-Schutz unten gilt dort nicht; „Try it out" sowie externe `$ref`s (`https://…`) erzeugen bewusst Netzwerkzugriffe.
 - **SVG-Grafiken:** funktionieren auf zwei Wegen direkt im Markdown –
   - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
@@ -57,6 +60,7 @@ node build.js --mermaid --katex  # → dist/tiny-md-full.html      (beides)
 node build.js --bundle=mit       # → dist/tiny-md-full-mit.html    (alle MIT-Plugins)
 node build.js --bundle=apache    # → dist/tiny-md-full-apache.html (alle MIT- und Apache-2.0-Plugins)
 node build.js --swagger          # → dist/tiny-md-swagger.html   (leere App inkl. SwaggerUI)
+node build.js --drawio           # → dist/tiny-md-drawio.html    (leere App inkl. draw.io-Viewer; lädt ihn beim ersten Bauen von GitHub, SHA-256-geprüft, nach vendor/)
 node build.js pfad/zu/datei.md   # → dist/datei.html             (Markdown fest eingebettet)
 node build.js pfad/zu/api.yaml   # → dist/api.html               (OpenAPI-Spezifikation fest eingebettet)
 ```

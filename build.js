@@ -5,6 +5,7 @@
  *   node build.js                 → dist/tiny-md.html          (leere App)
  *   node build.js --mermaid       → dist/tiny-md-mermaid.html  (leere App inkl. Mermaid)
  *   node build.js --swagger       → dist/tiny-md-swagger.html  (leere App inkl. SwaggerUI)
+ *   node build.js --drawio        → dist/tiny-md-drawio.html   (leere App inkl. draw.io-Viewer)
  *   node build.js --bundle=mit    → dist/tiny-md-full-mit.html    (alle MIT-lizenzierten Plugins)
  *   node build.js --bundle=apache → dist/tiny-md-full-apache.html (zusätzlich alle Apache-2.0-Plugins)
  *   node build.js pfad/notes.md   → dist/notes.html            (Markdown fest eingebettet)
@@ -64,6 +65,7 @@ const PLUGINS = {
   katex: { license: "MIT", auto: () => !isSpecFile &&
     (/\$\$[\s\S]+?\$\$/.test(embeddedMd) || /(^|[^\\$])\$\S[^$\n]*\$/m.test(embeddedMd)) },
   swagger: { license: "Apache-2.0", auto: () => isOpenApi },
+  drawio: { license: "Apache-2.0", auto: () => !isSpecFile && /^\s*(`{3,}|~{3,})\s*drawio\b/m.test(embeddedMd) },
 };
 
 // Lizenz-Bundles: welche Plugin-Lizenzen sie enthalten (apache ⊃ mit)
@@ -86,6 +88,39 @@ const enabled = name => {
 const withMermaid = enabled("mermaid");
 const withKatex = enabled("katex");
 const withSwagger = enabled("swagger");
+const withDrawio = enabled("drawio");
+
+// draw.io-Viewer (Apache-2.0): nicht auf npm, daher fest auf ein Release von
+// jgraph/drawio gepinnt, beim ersten Bauen geladen, per SHA-256 geprüft und
+// unter vendor/ zwischengespeichert. Neue Version: DRAWIO_VERSION und
+// DRAWIO_SHA256 gemeinsam ändern.
+const DRAWIO_VERSION = "32.6.10";
+const DRAWIO_SHA256 = "35b8ef54369e938ad2399d3c8ce3945591d4b200a01f6942d0e39743bea1f1a1";
+const drawioBase = `https://raw.githubusercontent.com/jgraph/drawio/v${DRAWIO_VERSION}/`;
+const drawioDir = path.join(ROOT, "vendor", "drawio", DRAWIO_VERSION);
+
+async function drawioJs() {
+  const sha256 = b => require("crypto").createHash("sha256").update(b).digest("hex");
+  const viewer = path.join(drawioDir, "viewer-static.min.js");
+  const license = path.join(drawioDir, "LICENSE");
+  if (!fs.existsSync(license) || !fs.existsSync(viewer) || sha256(fs.readFileSync(viewer)) !== DRAWIO_SHA256) {
+    // Erst beide Dateien laden und prüfen, dann ablegen: ein halber Cache entsteht nie.
+    const loaded = [];
+    for (const [file, target] of [["src/main/webapp/js/viewer-static.min.js", viewer], ["LICENSE", license]]) {
+      const res = await fetch(drawioBase + file);
+      if (!res.ok) throw new Error(`draw.io: ${file} nicht ladbar (HTTP ${res.status})`);
+      loaded.push([target, Buffer.from(await res.arrayBuffer())]);
+    }
+    if (sha256(loaded[0][1]) !== DRAWIO_SHA256) {
+      throw new Error("draw.io: Prüfsumme von viewer-static.min.js stimmt nicht");
+    }
+    fs.mkdirSync(drawioDir, { recursive: true });
+    for (const [target, bytes] of loaded) fs.writeFileSync(target, bytes);
+  }
+  const comment = s => "/*!\n * draw.io-Viewer " + DRAWIO_VERSION + " – https://github.com/jgraph/drawio\n"
+    + " * Copyright (c) JGraph Ltd, Apache License 2.0:\n" + s.replace(/\*\//g, "* /") + "\n*/\n";
+  return comment(read(license)) + read(viewer);
+}
 
 // KaTeX-CSS: pro @font-face nur den woff2-Eintrag behalten, Font als data:-URI einbetten
 function katexCss() {
@@ -118,7 +153,7 @@ const outName = mdArg
   : (withMermaid && withKatex ? "tiny-md-full"
     : withMermaid ? "tiny-md-mermaid"
     : withKatex ? "tiny-md-katex"
-    : "tiny-md") + (withSwagger ? "-swagger" : "") + ".html";
+    : "tiny-md") + (withSwagger ? "-swagger" : "") + (withDrawio ? "-drawio" : "") + ".html";
 
 let html = read(path.join(ROOT, "src", "template.html"));
 html = inject(html, "/*__MARKED_JS__*/", escapeScriptEnd(read(path.join(ROOT, "node_modules", "marked", "lib", "marked.umd.js"))));
@@ -134,6 +169,8 @@ html = inject(html, "/*__SWAGGER_JS__*/", withSwagger ? escapeScriptEnd(swaggerJ
 html = inject(html, "/*__SWAGGER_CSS__*/", withSwagger
   ? stripSourceMap(read(path.join(swaggerDist, "swagger-ui.css"))).replace(/<\/style/gi, "<\\/style")
   : "");
+(async () => {
+html = inject(html, "/*__DRAWIO_JS__*/", withDrawio ? escapeScriptEnd(await drawioJs()) : "");
 html = inject(html, "__EMBEDDED_FILENAME__", embeddedName.replace(/"/g, "&quot;"));
 html = inject(html, "__EMBEDDED_MD__", escapeScriptEnd(embeddedMd));
 
@@ -146,4 +183,6 @@ console.log(`✔ ${path.relative(ROOT, outPath)} (${kb} kB)`
   + (embeddedName ? ` – eingebettet: ${embeddedName}` : "")
   + (withMermaid ? " + Mermaid" : "")
   + (withKatex ? " + KaTeX" : "")
-  + (withSwagger ? " + SwaggerUI" : ""));
+  + (withSwagger ? " + SwaggerUI" : "")
+  + (withDrawio ? " + draw.io" : ""));
+})().catch(err => { console.error("✘ " + err.message); process.exit(1); });

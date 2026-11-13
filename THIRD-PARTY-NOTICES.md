@@ -13,6 +13,7 @@ Lizenz, die bei Weitergabe einzuhalten ist (Bezug: npm-Registry, Versionen gemä
 | [Mermaid](https://github.com/mermaid-js/mermaid) | MIT | © Knut Sveidqvist + contributors (das Bundle enthält eigene Abhängigkeiten wie d3/dagre unter MIT/ISC, Header im Bundle) |
 | [KaTeX](https://github.com/KaTeX/KaTeX) | MIT | © Khan Academy + contributors (inkl. der KaTeX-Schriften, ebenfalls MIT) |
 | [Swagger UI](https://github.com/swagger-api/swagger-ui) (`swagger-ui-dist`, nur Swagger-Variante) | Apache-2.0 | © SmartBear Software Inc. (das Bundle enthält eigene Abhängigkeiten wie React/js-yaml unter MIT u. a., Lizenz, NOTICE und Lizenz-Header der Abhängigkeiten werden mit eingebettet) |
+| [draw.io-Viewer](https://github.com/jgraph/drawio) (`viewer-static.min.js`, nur draw.io-Variante und Apache-Bundle; nicht auf npm, Bezug: GitHub-Release, Version und SHA-256 in `build.js` gepinnt) | Apache-2.0 | © JGraph Ltd (Lizenztext wird mit eingebettet; Formen- und Iconbibliotheken unterliegen laut draw.io-README zusätzlich einer Nutzungsbeschränkung für Atlassian-Produkte, die tiny-md nicht berührt) |
 
 ### Swagger UI (Apache-2.0)
 
@@ -29,6 +30,13 @@ Bei Weitergabe dieser Dateien müssen der Apache-2.0-Lizenztext und die NOTICE
 mitgegeben werden. Beides ist in die HTML-Dateien eingebettet und liegt dem
 Release zusätzlich als `LICENSE-Apache-2.0-SwaggerUI.txt` und
 `NOTICE-SwaggerUI.txt` bei.
+
+### draw.io-Viewer (Apache-2.0)
+
+Der draw.io-Viewer ist nur in `tiny-md-drawio.html` und `tiny-md-full-apache.html`
+enthalten. Er steht unter der [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+(© JGraph Ltd); draw.io liefert keine NOTICE-Datei. Der Lizenztext ist in die
+HTML-Dateien eingebettet und liegt dem Release als `LICENSE-Apache-2.0-drawio.txt` bei.
 
 Nur zur Entwicklung (nicht im Auslieferungsartefakt enthalten):
 

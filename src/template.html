@@ -139,6 +139,7 @@ body.mode-edit .md-body { padding-top: 24px; }
 .md-body hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
 .md-body .mermaid-diagram { margin: 1.2em 0; text-align: center; }
 .md-body .mermaid-diagram svg { max-width: 100%; height: auto; }
+.md-body .drawio-diagram { margin: 1.2em 0; max-width: 100%; overflow: auto; background: #fff; border-radius: 6px; }
 .md-body .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 .md-body .openapi-hint { color: var(--fg-muted); font-size: 0.9em; }
 
@@ -273,6 +274,14 @@ body.dragging #drop-overlay { display: flex; }
 <script>/*__MERMAID_JS__*/</script>
 <script>/*__KATEX_JS__*/</script>
 <script>/*__SWAGGER_JS__*/</script>
+<script>
+/* draw.io-Viewer offline: ohne diese Pfade lädt er Stile, Formen und Bilder von
+   viewer.diagrams.net nach. Leere Werte ersetzt der Viewer durch seine Standard-
+   adressen, daher lokale (nie vorhandene) Pfade. Nur in der draw.io-Variante wirksam. */
+window.PROXY_URL = window.STYLE_PATH = window.SHAPES_PATH = window.STENCIL_PATH =
+  window.DRAW_MATH_URL = window.GRAPH_IMAGE_PATH = window.mxImageBasePath = window.mxBasePath = "tiny-md-offline";
+</script>
+<script>/*__DRAWIO_JS__*/</script>
 
 <script>
 "use strict";
@@ -382,6 +391,73 @@ async function renderMermaidIn(container) {
   }
 }
 
+/* ---------- draw.io (optional, nur in der draw.io-Build-Variante enthalten) ----------
+   ```drawio-Codeblöcke mit dem Diagramm-XML (<mxfile> oder <mxGraphModel>, wie
+   „Extras › Diagramm bearbeiten“ es zeigt) werden mit dem draw.io-Viewer
+   gezeichnet; ungültige bleiben als Codeblock stehen. */
+const hasDrawio = typeof GraphViewer !== "undefined";
+
+/* Das Diagramm-XML für den Viewer, ohne alles, was beim Anzeigen nachladen würde:
+   Bilder (style image=…), Schriften (fontSource=…), Hintergrundbilder und
+   Fernbilder in HTML-Beschriftungen. Komprimierte Seiten werden dafür entpackt.
+   Kein Diagramm-XML → null (der Codeblock bleibt stehen). */
+const isRemote = v => !/^\s*data:/i.test(v) && v.includes("//");
+function offlineDrawioXml(text) {
+  const doc = new DOMParser().parseFromString(text.trim(), "text/xml");
+  const root = doc.documentElement;
+  if (doc.getElementsByTagName("parsererror").length || !/^(mxfile|mxGraphModel)$/.test(root.nodeName)) return null;
+  for (const page of Array.from(doc.getElementsByTagName("diagram"))) {
+    if (page.getElementsByTagName("mxGraphModel").length || !page.textContent.trim()) continue;
+    let model;
+    try {
+      model = new DOMParser().parseFromString(Graph.decompress(page.textContent.trim()), "text/xml").documentElement;
+    } catch (_) { return null; }
+    if (!model || model.nodeName !== "mxGraphModel") return null;
+    page.textContent = "";
+    page.appendChild(doc.importNode(model, true));
+  }
+  for (const node of Array.from(doc.getElementsByTagName("*"))) {
+    for (const attr of Array.from(node.attributes)) {
+      const v = attr.value;
+      if (attr.name === "style") {
+        node.setAttribute("style", v.split(";").filter(entry => {
+          const eq = entry.indexOf("=");
+          return eq < 0 || !/^(image|fontSource|imageBackground|backgroundImage)$/i.test(entry.slice(0, eq))
+            || !isRemote(decodeURIComponentSafe(entry.slice(eq + 1)));
+        }).join(";"));
+      } else if (/^backgroundImage$/i.test(attr.name) && isRemote(v)) {
+        node.removeAttribute(attr.name);
+      } else if (v.includes("<")) {
+        node.setAttribute(attr.name, DOMPurify.sanitize(v)); // HTML-Beschriftung: gleiche Regeln wie im Markdown
+      }
+    }
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+function decodeURIComponentSafe(v) {
+  try { return decodeURIComponent(v); } catch (_) { return v; }
+}
+
+function renderDrawioIn(container) {
+  if (!hasDrawio) return;
+  for (const code of container.querySelectorAll("pre > code.language-drawio")) {
+    const xml = offlineDrawioXml(code.textContent);
+    if (!xml) continue;
+    const div = document.createElement("div");
+    div.className = "drawio-diagram mxgraph";
+    div.setAttribute("data-mxgraph", JSON.stringify({
+      xml, toolbar: "pages zoom layers", nav: true, resize: true, lightbox: false, "check-visible-state": false,
+    }));
+    const pre = code.parentElement;
+    pre.replaceWith(div);
+    try {
+      GraphViewer.createViewerForElement(div);
+    } catch (_) {
+      div.replaceWith(pre); // Viewer kennt das XML nicht → Codeblock stehen lassen
+    }
+  }
+}
+
 /* ---------- OpenAPI (optional, nur in der Swagger-Build-Variante enthalten) ----------
    .yaml/.yml/.json-Dateien mit openapi:/swagger:-Versionsangabe werden mit
    SwaggerUI angezeigt; ohne SwaggerUI (oder bei anderem YAML/JSON) als Codeblock. */
@@ -457,6 +533,7 @@ function updatePreview() {
     a.rel = "noopener noreferrer";
   });
   resolveResources(el.preview);
+  renderDrawioIn(el.preview);
   renderMermaidIn(el.preview);
 }
 
@@ -471,7 +548,9 @@ function resourcePath(ref) {
   if (!ref || /^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("#") || ref.startsWith("//")) return null;
   const clean = ref.split("#")[0].split("?")[0];
   let url;
-  try { url = new URL(clean, "http://paket.invalid/" + state.baseDir); } catch (_) { return null; }
+  // Ordnernamen mit #, ? oder % kodieren, sonst ändern sie die Bedeutung der Basisadresse
+  const base = state.baseDir.split("/").map(encodeURIComponent).join("/");
+  try { url = new URL(clean, "http://paket.invalid/" + base); } catch (_) { return null; }
   try { return decodeURIComponent(url.pathname.slice(1)); } catch (_) { return url.pathname.slice(1); }
 }
 
@@ -489,7 +568,10 @@ function resolveResources(container) {
     const path = resourcePath(node.getAttribute(attr));
     if (path === null || !state.resources.has(path)) continue;
     if (attr === "href") node.setAttribute("download", path.split("/").pop());
-    resourceUrl(path).then(url => node.setAttribute(attr, url), () => {});
+    // Fragment (z. B. SVG-Ansicht #chart1) bleibt am blob:-URL erhalten
+    const hash = node.getAttribute(attr).indexOf("#");
+    const fragment = hash >= 0 ? node.getAttribute(attr).slice(hash) : "";
+    resourceUrl(path).then(url => node.setAttribute(attr, url + fragment), () => {});
   }
 }
 
@@ -532,6 +614,18 @@ async function readZip(file) {
   const dirOffset = tail.getUint32(eocd + 16, true);
   const dir = new DataView(await file.slice(dirOffset, dirOffset + dirSize).arrayBuffer());
   const utf8 = new TextDecoder("utf-8");
+  // Ohne UTF-8-Kennzeichen (Bit 11) sind Namen CP437 kodiert, außer ein
+  // Unicode-Path-Extra-Feld (0x7075) liefert den UTF-8-Namen mit.
+  const CP437 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u00a0";
+  const cp437 = bytes => Array.from(bytes, b => b < 128 ? String.fromCharCode(b) : CP437[b - 128]).join("");
+  const unicodePath = (extra) => {
+    for (let i = 0; i + 4 <= extra.length; ) {
+      const id = extra[i] | (extra[i + 1] << 8), size = extra[i + 2] | (extra[i + 3] << 8);
+      if (id === 0x7075 && size > 5) return utf8.decode(extra.subarray(i + 9, i + 4 + size));
+      i += 4 + size;
+    }
+    return null;
+  };
   const entries = new Map();
   let p = 0;
   for (let n = 0; n < count && dir.getUint32(p, true) === 0x02014b50; n++) {
@@ -541,7 +635,10 @@ async function readZip(file) {
     const extraLen = dir.getUint16(p + 30, true);
     const commentLen = dir.getUint16(p + 32, true);
     const local = dir.getUint32(p + 42, true);
-    const name = utf8.decode(new Uint8Array(dir.buffer, dir.byteOffset + p + 46, nameLen));
+    const flags = dir.getUint16(p + 8, true);
+    const nameBytes = new Uint8Array(dir.buffer, dir.byteOffset + p + 46, nameLen);
+    const extra = new Uint8Array(dir.buffer, dir.byteOffset + p + 46 + nameLen, extraLen);
+    const name = flags & 0x800 ? utf8.decode(nameBytes) : unicodePath(extra) || cp437(nameBytes);
     p += 46 + nameLen + extraLen + commentLen;
     if (name.endsWith("/") || name.split("/").includes("..")) continue;
     entries.set(name, async () => {
@@ -845,6 +942,19 @@ el.btnTheme.addEventListener("click", () => {
       "Diese Variante rendert Formeln in `$…$` und `$$…$$`, zum Beispiel $\\Delta\\theta \\approx \\lambda / D$ oder",
       "",
       "$$D \\approx \\frac{\\lambda}{\\Delta\\theta} = \\frac{0{,}343\\,\\mathrm{m}}{0{,}175} \\approx 2{,}0\\,\\mathrm{m}.$$",
+    ] : []).concat(hasDrawio ? [
+      "",
+      "## draw.io ist an Bord",
+      "",
+      "Diese Variante zeichnet ` ```drawio `-Codeblöcke mit dem Diagramm-XML (in draw.io: *Extras › Diagramm bearbeiten*):",
+      "",
+      "```drawio",
+      '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>',
+      '<mxCell id="2" value="Markdown" style="rounded=1;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="20" y="20" width="120" height="50" as="geometry"/></mxCell>',
+      '<mxCell id="3" value="Diagramm" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;" vertex="1" parent="1"><mxGeometry x="220" y="20" width="120" height="50" as="geometry"/></mxCell>',
+      '<mxCell id="4" edge="1" parent="1" source="2" target="3"><mxGeometry relative="1" as="geometry"/></mxCell>',
+      "</root></mxGraphModel>",
+      "```",
     ] : []).concat(hasSwagger ? [
       "",
       "## SwaggerUI ist an Bord",
