@@ -289,6 +289,25 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("ohne swagger: Hinweis auf Swagger-Variante", pp.textContent.includes("tiny-md-swagger.html"));
   }
 
+  /* ---------- draw.io (Apache-2.0): eigene Variante und Apache-Bundle ---------- */
+  {
+    const read = f => fs.readFileSync(path.join(__dirname, "..", "dist", f), "utf8");
+    check("tiny-md-drawio.html enthält den draw.io-Viewer", distSize("tiny-md-drawio.html") > 4_000_000
+      && read("tiny-md-drawio.html").includes("GraphViewer"));
+    check("tiny-md-drawio.html: Apache-2.0-Lizenz von draw.io eingebettet",
+      read("tiny-md-drawio.html").includes("draw.io-Viewer") && read("tiny-md-drawio.html").includes("Apache License"));
+    check("full-apache: draw.io enthalten", read("tiny-md-full-apache.html").includes("GraphViewer"));
+    for (const f of ["tiny-md.html", "tiny-md-full-mit.html", "tiny-md-mermaid.html"]) {
+      check(`${f}: kein draw.io (Apache-2.0)`, !read(f).includes("GraphViewer.createViewerForElement=function"));
+    }
+    check("draw.io offline: keine Viewer-Standardadressen aktiv",
+      read("tiny-md-drawio.html").includes('window.mxBasePath = "tiny-md-offline"'));
+    const wd = loadApp("tiny-md-drawio.html");
+    const pd = wd.document.getElementById("preview");
+    check("drawio-variante: App startet mit Beispieldiagramm",
+      /draw\.io ist an Bord/.test(pd.innerHTML) && pd.querySelector(".drawio-diagram, code.language-drawio") !== null);
+  }
+
   check("tiny-md-katex.html enthält KaTeX + Fonts", distSize("tiny-md-katex.html") > 500_000);
   check("tiny-md-full.html enthält Mermaid + KaTeX", distSize("tiny-md-full.html") > 4_000_000);
 
