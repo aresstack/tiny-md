@@ -533,6 +533,8 @@ const state = {
   modified: false,
   fileHandle: null,   // File System Access API (Edge/Chrome), sonst null
   embedded: false,
+  folderFind: null, // Nachschlagen im freigegebenen Ordner, für beim Bearbeiten neue Ziele
+  folderTried: null,
   folderNote: null, // Hinweis zum freigegebenen Ordner (liest noch, Bilder nicht gefunden)
   docSerial: 0, // zählt geöffnete Dokumente; späte Ordnerergebnisse eines Vorgängers werden verworfen
   // Dateien neben dem Dokument (aus ZIP oder abgelegtem Ordner): Pfad → () => Promise<Blob>
@@ -567,6 +569,7 @@ function updatePreview() {
     a.rel = "noopener noreferrer";
   });
   resolveResources(el.preview);
+  if (state.folderFind) resolveNewTargets();
   updateFolderHint();
   renderDrawioIn(el.preview);
   renderMermaidIn(el.preview);
@@ -648,53 +651,81 @@ function neededPaths() {
 
 /* Ordner über die File System Access API: Pfade direkt über den Ordner auflösen,
    ohne ihn ganz aufzuzählen (auch wenn „Downloads“ samt allem gewählt wurde).
-   Gewählt sein darf der Ordner des Dokuments, einer darüber (bis zwei Ebenen)
-   oder einer darunter, z. B. gleich „assets“. */
+   Gewählt sein darf der Ordner des Dokuments, einer bis zwei Ebenen darüber
+   (die flachste gleichnamige Datei gilt) oder der Bilderordner selbst. */
 async function fileAt(dir, segments) {
   let current = dir;
   for (const name of segments.slice(0, -1)) current = await current.getDirectoryHandle(name);
   return current.getFileHandle(segments[segments.length - 1]);
 }
 
-async function documentDir(dir, depth) {
-  try { await dir.getFileHandle(state.filename); return dir; } catch (_) { /* nicht hier */ }
-  if (depth <= 0) return null;
-  for await (const [name, handle] of dir.entries()) {
-    if (handle.kind !== "directory" || name.startsWith(".") || name === "node_modules") continue;
-    const found = await documentDir(handle, depth - 1);
-    if (found) return found;
+// Wo liegt das Dokument im gewählten Ordner? Ebene für Ebene, die flachste zuerst; null, wenn nicht darin
+async function documentPath(dir) {
+  let level = [[dir, []]];
+  for (let depth = 0; depth <= 2 && level.length; depth++) {
+    const next = [];
+    for (const [current, segments] of level) {
+      try { await current.getFileHandle(state.filename); return segments; } catch (_) { /* nicht hier */ }
+      if (depth === 2) continue;
+      for await (const [name, handle] of current.entries()) {
+        if (handle.kind === "directory" && !name.startsWith(".") && name !== "node_modules") {
+          next.push([handle, segments.concat(name)]);
+        }
+      }
+    }
+    level = next;
   }
   return null;
 }
 
+/* Kandidaten für einen Pfad: der Pfad selbst; liegt das Dokument nicht im
+   gewählten Ordner und heißt dieser wie ein Teil des Pfads (z. B. „assets“),
+   zusätzlich der Rest dahinter. Nie bloß der Dateiname. */
+function candidates(path, documentFound, folderName) {
+  const segments = path.split("/").filter(Boolean);
+  const result = [segments];
+  if (!documentFound && folderName) {
+    segments.forEach((name, i) => {
+      if (name === folderName && i + 1 < segments.length) result.push(segments.slice(i + 1));
+    });
+  }
+  return result;
+}
+
 async function handleLookup(dir) {
-  const base = (await documentDir(dir, 2)) || dir;
-  return async path => {
-    const segments = path.split("/").filter(Boolean);
-    for (let i = 0; i < segments.length; i++) {
-      try {
-        const file = await fileAt(base, segments.slice(i));
-        return () => file.getFile();
-      } catch (_) { /* weiter mit kürzerem Pfad */ }
-    }
-    return null;
+  const location = await documentPath(dir);
+  return {
+    base: location ? location.map(name => name + "/").join("") : "",
+    find: async path => {
+      for (const segments of candidates(path, location !== null, dir.name)) {
+        try {
+          const file = await fileAt(dir, segments);
+          return () => file.getFile();
+        } catch (_) { /* nächster Kandidat */ }
+      }
+      return null;
+    },
   };
 }
 
 // Ordner über <input webkitdirectory> (Firefox): alle Dateien liegen schon als Liste vor
-function listLookup(files) {
+function listLookup(files, folderName) {
   const own = [...files.keys()].filter(p => p.split("/").pop() === state.filename)
     .sort((a, b) => a.split("/").length - b.split("/").length)[0];
-  const prefix = own ? own.slice(0, own.lastIndexOf("/") + 1) : "";
-  return async path => {
-    const segments = path.split("/").filter(Boolean);
-    for (let i = 0; i < segments.length; i++) {
-      const tail = segments.slice(i).join("/");
-      if (files.has(prefix + tail)) return files.get(prefix + tail);
-      if (files.has(tail)) return files.get(tail);
-    }
-    return null;
+  return {
+    base: own ? own.slice(0, own.lastIndexOf("/") + 1) : "",
+    find: async path => {
+      for (const segments of candidates(path, own !== undefined, folderName)) {
+        const key = segments.join("/");
+        if (files.has(key)) return files.get(key);
+      }
+      return null;
+    },
   };
+}
+
+function folderResource(path, open) {
+  return () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) }));
 }
 
 async function useFolder(lookup, serial, name) {
@@ -702,27 +733,44 @@ async function useFolder(lookup, serial, name) {
   state.folderNote = BUSY;
   updateFolderHint();
   const resources = new Map();
-  let images = 0;
+  let found = null;
   try {
-    const find = await lookup();
-    const imagePaths = new Set([...el.preview.querySelectorAll("img[src]")]
-      .map(img => resourcePath(img.getAttribute("src"))).filter(Boolean));
+    found = await lookup();
+    if (serial !== state.docSerial) return;
+    state.baseDir = found.base; // relative Ziele gelten ab dem Ordner des Dokuments, auch „../“
     for (const path of neededPaths()) {
-      const open = await find(path);
+      const open = await found.find(path);
       if (serial !== state.docSerial) return;
-      if (!open) continue;
-      if (imagePaths.has(path)) images++;
-      resources.set(path, () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) })));
+      if (open) resources.set(path, folderResource(path, open));
     }
   } catch (_) {
     if (serial !== state.docSerial) return;
   }
-  if (serial !== state.docSerial) return;
-  state.folderNote = images > 0 || resources.size > 0 ? null
+  state.folderNote = resources.size > 0 ? null
     : "Im Ordner „" + name + "“ liegen die Bilder nicht. Wähle den Ordner, in dem „" + state.filename
       + "“ liegt (mit dem Unterordner der Bilder) – oder öffne gleich das ZIP.";
-  setResources(resources.size ? resources : null, "");
+  setResources(resources.size ? resources : null, found ? found.base : "");
+  if (resources.size) {
+    state.folderFind = found.find; // beim Bearbeiten neu hinzugekommene Ziele ebenfalls aus dem Ordner
+    state.folderTried = new Set(neededPaths());
+  }
   updatePreview();
+}
+
+// Nach dem Bearbeiten: Ziele, die noch nicht im Ordner gesucht wurden, nachschlagen
+async function resolveNewTargets() {
+  const serial = state.docSerial;
+  const find = state.folderFind;
+  const missing = neededPaths().filter(p => !state.resources.has(p) && !state.folderTried.has(p));
+  if (!missing.length) return;
+  missing.forEach(p => state.folderTried.add(p));
+  let added = false;
+  for (const path of missing) {
+    const open = await find(path).catch(() => null);
+    if (serial !== state.docSerial || find !== state.folderFind) return;
+    if (open) { state.resources.set(path, folderResource(path, open)); added = true; }
+  }
+  if (added) resolveResources(el.preview);
 }
 
 async function shareFolder() {
@@ -754,7 +802,7 @@ document.getElementById("folder-input").addEventListener("change", e => {
     files.set(parts.slice(1).join("/") || f.name, () => f);
   }
   e.target.value = "";
-  if (files.size) useFolder(async () => listLookup(files), folderSerial, name);
+  if (files.size) useFolder(async () => listLookup(files, name), folderSerial, name);
 });
 
 function setResources(resources, baseDir) {
@@ -762,6 +810,8 @@ function setResources(resources, baseDir) {
   blobUrls.clear();
   state.resources = resources;
   state.baseDir = baseDir || "";
+  state.folderFind = null;
+  state.folderTried = null;
 }
 
 const MIME = {

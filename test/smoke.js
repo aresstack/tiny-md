@@ -310,6 +310,43 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("freigabe: falscher Ordner sagt, welcher gemeint ist", !shown(wrong) && wrongHint.classList.contains("visible")
       && /Im Ordner „Bilder“ liegen die Bilder nicht/.test(wrongHint.textContent), wrongHint.textContent);
 
+    // Inhalt der angezeigten Bilder: blob:-URLs merken, welche Datei dahinter steht
+    const shareDoc = async (doc, dir) => {
+      const w = loadApp("tiny-md.html");
+      const blobs = [];
+      w.URL.createObjectURL = b => { blobs.push(b); return "blob:null/" + blobs.length; };
+      w.URL.revokeObjectURL = () => {};
+      drop(w, new w.File([doc], "pages.md"), { kind: "file" });
+      await new Promise(r => setTimeout(r, 200));
+      w.showDirectoryPicker = async () => dir(w);
+      w.document.getElementById("btn-folder").click();
+      await new Promise(r => setTimeout(r, 300));
+      const content = async alt => {
+        const src = (w.document.querySelector('#preview img[alt="' + alt + '"]') || {}).src || "";
+        const n = src.startsWith("blob:null/") ? Number(src.slice(10)) : 0;
+        return n ? await blobs[n - 1].text() : null;
+      };
+      return { w, content };
+    };
+    const one = "# Paket\n\n![Bild](assets/a.png)";
+    const nested = await shareDoc(one, w => fakeDir(w, "Downloads", {
+      old: { archive: { "pages.md": one, assets: { "a.png": "ALT" } } },
+      current: { "pages.md": one, assets: { "a.png": "NEU" } } }));
+    check("freigabe: die flachste pages.md gilt", (await nested.content("Bild")) === "NEU");
+    const noSubstitute = await shareDoc("![Chart](reports/chart.png)", w => fakeDir(w, "MoeVe",
+      { "pages.md": "x", "chart.png": "FREMD" }));
+    check("freigabe: nie bloß der Dateiname", (await noSubstitute.content("Chart")) === null);
+    const upward = await shareDoc("![Eins](../assets/one.png)", w => fakeDir(w, "Projekt",
+      { docs: { "pages.md": "x" }, assets: { "one.png": "EINS" } }));
+    check("freigabe: ../ gilt ab dem Ordner des Dokuments", (await upward.content("Eins")) === "EINS");
+    const editing = await shareDoc(one, w => fakeDir(w, "MoeVe",
+      { "pages.md": one, assets: { "a.png": "A", "b.png": "B" } }));
+    const ed = editing.w.document.getElementById("editor");
+    ed.value = one + "\n\n![Zwei](assets/b.png)";
+    ed.dispatchEvent(new editing.w.Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 500));
+    check("freigabe: beim Bearbeiten neues Bild aus dem Ordner", (await editing.content("Zwei")) === "B");
+
     // Ordner wird noch gelesen, inzwischen ein anderes Dokument geöffnet → Ergebnis verwerfen
     const ws2 = withBlobs(loadApp("tiny-md.html"));
     drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
