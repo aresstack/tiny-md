@@ -243,6 +243,7 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
       Object.assign(new wh.File([md], "pages.md"), { webkitRelativePath: "MoeVe/pages.md" }),
       Object.defineProperty(new wh.File(["PNG"], "a b.png"), "webkitRelativePath", { value: "MoeVe/assets/a b.png" }),
     ] });
+    wh.document.getElementById("btn-folder").click(); // ohne showDirectoryPicker: Ordnerauswahl über das Eingabefeld
     folderInput.dispatchEvent(new wh.Event("change"));
     await new Promise(r => setTimeout(r, 200));
     check("einzeln: nach Freigabe Bild aus dem Ordner",
@@ -262,19 +263,60 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("eingebettet: Hinweis Ordner freigeben für später geöffnete .md",
       we.document.getElementById("folder-hint").classList.contains("visible"));
 
+    // Ordner-Handle wie showDirectoryPicker ihn liefert; tree: Name → Inhalt (String) oder Unterordner (Objekt)
+    const fakeDir = (w, name, tree, gate) => {
+      const notFound = () => Object.assign(new Error("nicht gefunden"), { name: "NotFoundError" });
+      return {
+        kind: "directory", name,
+        async getFileHandle(n) {
+          await gate;
+          if (typeof tree[n] !== "string") throw notFound();
+          return { kind: "file", name: n, getFile: async () => new w.File([tree[n]], n) };
+        },
+        async getDirectoryHandle(n) {
+          await gate;
+          if (!tree[n] || typeof tree[n] !== "object") throw notFound();
+          return fakeDir(w, n, tree[n], gate);
+        },
+        async *entries() {
+          await gate;
+          for (const [n, v] of Object.entries(tree)) {
+            yield [n, typeof v === "string" ? { kind: "file", name: n } : fakeDir(w, n, v, gate)];
+          }
+        },
+      };
+    };
+    const share = async (dir) => {
+      const w = withBlobs(loadApp("tiny-md.html"));
+      drop(w, new w.File([md], "pages.md"), { kind: "file" });
+      await new Promise(r => setTimeout(r, 200));
+      w.showDirectoryPicker = async () => dir(w);
+      w.document.getElementById("btn-folder").click();
+      await new Promise(r => setTimeout(r, 300));
+      return w;
+    };
+    const shown = w => (w.document.querySelector('#preview img[alt="Bild"]') || {}).src === "blob:null/1";
+    const export_ = { "pages.md": md, assets: { "a b.png": "PNG" } };
+
+    const exact = await share(w => fakeDir(w, "MoeVe", export_));
+    check("freigabe: Ordner des Dokuments", shown(exact)
+      && !exact.document.getElementById("folder-hint").classList.contains("visible"));
+    const parent = await share(w => fakeDir(w, "Downloads", { "anderes": { "x.txt": "x" }, "MoeVe": export_ }));
+    check("freigabe: Ordner darüber (Downloads) findet den Export", shown(parent));
+    const assetsOnly = await share(w => fakeDir(w, "assets", export_.assets));
+    check("freigabe: gleich der Bilderordner gewählt", shown(assetsOnly));
+    const wrong = await share(w => fakeDir(w, "Bilder", { "urlaub.jpg": "JPG" }));
+    const wrongHint = wrong.document.getElementById("folder-hint");
+    check("freigabe: falscher Ordner sagt, welcher gemeint ist", !shown(wrong) && wrongHint.classList.contains("visible")
+      && /Im Ordner „Bilder“ liegen die Bilder nicht/.test(wrongHint.textContent), wrongHint.textContent);
+
     // Ordner wird noch gelesen, inzwischen ein anderes Dokument geöffnet → Ergebnis verwerfen
     const ws2 = withBlobs(loadApp("tiny-md.html"));
     drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
     await new Promise(r => setTimeout(r, 200));
     let release;
     const gate = new Promise(r => { release = r; });
-    ws2.showDirectoryPicker = async () => ({ async *entries() {
-      await gate;
-      yield ["pages.md", { kind: "file", getFile: async () => new ws2.File([md], "pages.md") }];
-      yield ["assets", { kind: "directory", async *entries() {
-        yield ["a b.png", { kind: "file", getFile: async () => new ws2.File(["PNG"], "a b.png") }];
-      } }];
-    } });
+    ws2.showDirectoryPicker = async () => fakeDir(ws2, "MoeVe", export_, gate);
     ws2.document.getElementById("btn-folder").click();
     await new Promise(r => setTimeout(r, 50));
     drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
