@@ -148,6 +148,81 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("drop: Dateiname übernommen", wd.document.title.includes("drop.md"));
   }
 
+  /* ---------- Markdown-Paket: Bilder aus ZIP und abgelegtem Ordner ---------- */
+  {
+    // Gespeichertes ZIP (ohne Kompression) wie das Markdown-Paket von Space Harvester
+    const zipOf = files => {
+      const parts = [], dir = [];
+      let offset = 0;
+      for (const [name, data] of files) {
+        const n = Buffer.from(name, "utf8"), d = Buffer.from(data);
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x800, 6);
+        local.writeUInt32LE(d.length, 18); local.writeUInt32LE(d.length, 22); local.writeUInt16LE(n.length, 26);
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(0x800, 8); central.writeUInt32LE(d.length, 20); central.writeUInt32LE(d.length, 24);
+        central.writeUInt16LE(n.length, 28); central.writeUInt32LE(offset, 42);
+        parts.push(local, n, d); dir.push(central, n);
+        offset += 30 + n.length + d.length;
+      }
+      const dirBuf = Buffer.concat(dir), end = Buffer.alloc(22);
+      end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10);
+      end.writeUInt32LE(dirBuf.length, 12); end.writeUInt32LE(offset, 16);
+      return Buffer.concat([...parts, dirBuf, end]);
+    };
+    const md = "# Paket\n\n![Bild](assets/a%20b.png)\n\n[Bericht](attachments/1/bericht.pdf) [Web](https://example.org)\n\n![Fehlt](assets/fehlt.png)";
+    const withBlobs = w => {
+      let n = 0;
+      w.URL.createObjectURL = () => "blob:null/" + (++n);
+      w.URL.revokeObjectURL = () => {};
+      if (!w.TextDecoder) w.TextDecoder = TextDecoder;
+      return w;
+    };
+    const drop = (w, file, item) => {
+      const ev = new w.Event("drop", { bubbles: true, cancelable: true });
+      ev.dataTransfer = { files: [file], items: [item] };
+      w.document.dispatchEvent(ev);
+    };
+
+    const wz = withBlobs(loadApp("tiny-md.html"));
+    const zip = zipOf([["pages.md", md], ["assets/a b.png", "PNG"], ["attachments/1/bericht.pdf", "%PDF"]]);
+    drop(wz, new wz.File([zip], "export-markdown.zip", { type: "application/zip" }), { kind: "file" });
+    await new Promise(r => setTimeout(r, 300));
+    const pz = wz.document.getElementById("preview");
+    check("zip: pages.md geöffnet", /<h1[^>]*>Paket<\/h1>/.test(pz.innerHTML), pz.innerHTML.slice(0, 160));
+    check("zip: Bild zeigt auf Datei im ZIP", (pz.querySelector('img[alt="Bild"]') || {}).src === "blob:null/1",
+      pz.innerHTML.slice(0, 400));
+    const link = pz.querySelector("a[download]");
+    check("zip: Anhang verlinkt", link && link.getAttribute("href").startsWith("blob:") && link.download === "bericht.pdf");
+    check("zip: fehlendes Bild bleibt relativ", pz.querySelector('img[alt="Fehlt"]').getAttribute("src") === "assets/fehlt.png");
+    check("zip: Weblink bleibt", pz.querySelector('a[href="https://example.org"]') !== null);
+    check("zip: Dateiname pages.md", wz.document.title.includes("pages.md"));
+
+    // Entpackter Ordner, per Drag & Drop abgelegt
+    const wo = withBlobs(loadApp("tiny-md.html"));
+    const fileEntry = (name, data) => ({ isFile: true, isDirectory: false, name,
+      file: ok => ok(new wo.File([data], name)) });
+    const dirEntry = (name, children) => ({ isFile: false, isDirectory: true, name, createReader() {
+      let done = false;
+      return { readEntries: ok => { const batch = done ? [] : children; done = true; ok(batch); } };
+    } });
+    const folder = dirEntry("MoeVe", [fileEntry("pages.md", md),
+      dirEntry("assets", [fileEntry("a b.png", "PNG")])]);
+    drop(wo, new wo.File([""], "MoeVe"), { kind: "file", webkitGetAsEntry: () => folder });
+    await new Promise(r => setTimeout(r, 300));
+    const po = wo.document.getElementById("preview");
+    check("ordner: pages.md geöffnet", /<h1[^>]*>Paket<\/h1>/.test(po.innerHTML), po.innerHTML.slice(0, 160));
+    check("ordner: Bild zeigt auf Datei im Ordner", (po.querySelector('img[alt="Bild"]') || {}).src === "blob:null/1",
+      po.innerHTML.slice(0, 400));
+
+    // Danach eine einzelne .md: keine Dateien des Pakets mehr
+    drop(wo, new wo.File([md], "einzeln.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    check("einzeln: relative Pfade bleiben, wie sie sind",
+      wo.document.querySelector('#preview img[alt="Bild"]').getAttribute("src") === "assets/a%20b.png");
+  }
+
   /* ---------- Mathe: Roundtrip über den Editor-Eingabepfad ---------- */
   {
     const wk = loadApp("tiny-md-katex.html");
