@@ -155,13 +155,15 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
       const parts = [], dir = [];
       let offset = 0;
       for (const [name, data] of files) {
-        const n = Buffer.from(name, "utf8"), d = Buffer.from(data);
+        // Name als Buffer = CP437 ohne UTF-8-Kennzeichen, sonst UTF-8 mit Kennzeichen
+        const legacy = Buffer.isBuffer(name);
+        const n = legacy ? name : Buffer.from(name, "utf8"), d = Buffer.from(data);
         const local = Buffer.alloc(30);
-        local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x800, 6);
+        local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(legacy ? 0 : 0x800, 6);
         local.writeUInt32LE(d.length, 18); local.writeUInt32LE(d.length, 22); local.writeUInt16LE(n.length, 26);
         const central = Buffer.alloc(46);
         central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6);
-        central.writeUInt16LE(0x800, 8); central.writeUInt32LE(d.length, 20); central.writeUInt32LE(d.length, 24);
+        central.writeUInt16LE(legacy ? 0 : 0x800, 8); central.writeUInt32LE(d.length, 20); central.writeUInt32LE(d.length, 24);
         central.writeUInt16LE(n.length, 28); central.writeUInt32LE(offset, 42);
         parts.push(local, n, d); dir.push(central, n);
         offset += 30 + n.length + d.length;
@@ -198,6 +200,19 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     check("zip: fehlendes Bild bleibt relativ", pz.querySelector('img[alt="Fehlt"]').getAttribute("src") === "assets/fehlt.png");
     check("zip: Weblink bleibt", pz.querySelector('a[href="https://example.org"]') !== null);
     check("zip: Dateiname pages.md", wz.document.title.includes("pages.md"));
+
+    // Ordner mit # im Namen, Fragment am Bild, alter CP437-Dateiname (ä = 0x84)
+    const wl = withBlobs(loadApp("tiny-md.html"));
+    const md2 = "# Alt\n\n![Ä](%C3%A4.png)\n\n![Sicht](bild.svg#chart1)";
+    const zip2 = zipOf([["Export #1/pages.md", md2], [Buffer.from([0x84, 0x2e, 0x70, 0x6e, 0x67]), "PNG"],
+      ["Export #1/bild.svg", "<svg/>"]].map(([n, d]) => [Buffer.isBuffer(n) ? Buffer.concat([Buffer.from("Export #1/"), n]) : n, d]));
+    drop(wl, new wl.File([zip2], "alt.zip"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 300));
+    const pl = wl.document.getElementById("preview");
+    check("zip: Ordner mit # und CP437-Name aufgelöst", (pl.querySelector('img[alt="Ä"]') || {}).src === "blob:null/1",
+      pl.innerHTML.slice(0, 300));
+    check("zip: Fragment bleibt am Bild", (pl.querySelector('img[alt="Sicht"]') || {}).src === "blob:null/2#chart1",
+      pl.innerHTML.slice(0, 300));
 
     // Entpackter Ordner, per Drag & Drop abgelegt
     const wo = withBlobs(loadApp("tiny-md.html"));

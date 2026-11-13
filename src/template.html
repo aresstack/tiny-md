@@ -507,7 +507,9 @@ function resourcePath(ref) {
   if (!ref || /^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("#") || ref.startsWith("//")) return null;
   const clean = ref.split("#")[0].split("?")[0];
   let url;
-  try { url = new URL(clean, "http://paket.invalid/" + state.baseDir); } catch (_) { return null; }
+  // Ordnernamen mit #, ? oder % kodieren, sonst ändern sie die Bedeutung der Basisadresse
+  const base = state.baseDir.split("/").map(encodeURIComponent).join("/");
+  try { url = new URL(clean, "http://paket.invalid/" + base); } catch (_) { return null; }
   try { return decodeURIComponent(url.pathname.slice(1)); } catch (_) { return url.pathname.slice(1); }
 }
 
@@ -525,7 +527,10 @@ function resolveResources(container) {
     const path = resourcePath(node.getAttribute(attr));
     if (path === null || !state.resources.has(path)) continue;
     if (attr === "href") node.setAttribute("download", path.split("/").pop());
-    resourceUrl(path).then(url => node.setAttribute(attr, url), () => {});
+    // Fragment (z. B. SVG-Ansicht #chart1) bleibt am blob:-URL erhalten
+    const hash = node.getAttribute(attr).indexOf("#");
+    const fragment = hash >= 0 ? node.getAttribute(attr).slice(hash) : "";
+    resourceUrl(path).then(url => node.setAttribute(attr, url + fragment), () => {});
   }
 }
 
@@ -568,6 +573,18 @@ async function readZip(file) {
   const dirOffset = tail.getUint32(eocd + 16, true);
   const dir = new DataView(await file.slice(dirOffset, dirOffset + dirSize).arrayBuffer());
   const utf8 = new TextDecoder("utf-8");
+  // Ohne UTF-8-Kennzeichen (Bit 11) sind Namen CP437 kodiert, außer ein
+  // Unicode-Path-Extra-Feld (0x7075) liefert den UTF-8-Namen mit.
+  const CP437 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u00a0";
+  const cp437 = bytes => Array.from(bytes, b => b < 128 ? String.fromCharCode(b) : CP437[b - 128]).join("");
+  const unicodePath = (extra) => {
+    for (let i = 0; i + 4 <= extra.length; ) {
+      const id = extra[i] | (extra[i + 1] << 8), size = extra[i + 2] | (extra[i + 3] << 8);
+      if (id === 0x7075 && size > 5) return utf8.decode(extra.subarray(i + 9, i + 4 + size));
+      i += 4 + size;
+    }
+    return null;
+  };
   const entries = new Map();
   let p = 0;
   for (let n = 0; n < count && dir.getUint32(p, true) === 0x02014b50; n++) {
@@ -577,7 +594,10 @@ async function readZip(file) {
     const extraLen = dir.getUint16(p + 30, true);
     const commentLen = dir.getUint16(p + 32, true);
     const local = dir.getUint32(p + 42, true);
-    const name = utf8.decode(new Uint8Array(dir.buffer, dir.byteOffset + p + 46, nameLen));
+    const flags = dir.getUint16(p + 8, true);
+    const nameBytes = new Uint8Array(dir.buffer, dir.byteOffset + p + 46, nameLen);
+    const extra = new Uint8Array(dir.buffer, dir.byteOffset + p + 46 + nameLen, extraLen);
+    const name = flags & 0x800 ? utf8.decode(nameBytes) : unicodePath(extra) || cp437(nameBytes);
     p += 46 + nameLen + extraLen + commentLen;
     if (name.endsWith("/") || name.split("/").includes("..")) continue;
     entries.set(name, async () => {
