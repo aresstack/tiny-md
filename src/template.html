@@ -100,6 +100,12 @@ body.mode-edit #editor-pane { display: flex; }
 }
 @media print { #folder-hint { display: none !important; } }
 
+/* Volle Breite (Standard): Text, Tabellen und Diagramme nutzen das ganze Fenster.
+   Lesebreite: schmale Spalte in der Mitte wie bisher. */
+html[data-width="full"] .md-body,
+html[data-width="full"] #folder-hint { max-width: none; }
+html[data-width="full"] #folder-hint { margin-left: 32px; margin-right: 32px; }
+
 /* ---------- Markdown-Typografie ---------- */
 .md-body {
   max-width: 46rem;
@@ -189,6 +195,7 @@ html[data-theme="dark"] #swagger { filter: invert(0.92) hue-rotate(180deg); }
   background: var(--bg-soft);
 }
 #statusbar .left { display: flex; }
+#statusbar .center { display: flex; }
 #statusbar .right { display: flex; justify-content: flex-end; gap: 18px; padding: 0 14px; }
 /* Quadratische Icon-Buttons ohne Abstand, Beschriftung per Tooltip (title) */
 .icon-btn {
@@ -285,9 +292,14 @@ body.dragging #drop-overlay { display: flex; }
       <svg class="ico-read" viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
     </button>
   </div>
-  <button id="btn-theme" class="icon-btn" title="Hell/Dunkel umschalten" aria-label="Hell/Dunkel umschalten">
-    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>
-  </button>
+  <div class="center">
+    <button id="btn-width" class="icon-btn" title="Volle Breite / Lesebreite umschalten" aria-label="Volle Breite" aria-pressed="true">
+      <svg viewBox="0 0 16 16"><path d="M1.5 8h13"/><path d="M4 5.5 1.5 8 4 10.5"/><path d="M12 5.5l2.5 2.5-2.5 2.5"/></svg>
+    </button>
+    <button id="btn-theme" class="icon-btn" title="Hell/Dunkel umschalten" aria-label="Hell/Dunkel umschalten">
+      <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>
+    </button>
+  </div>
   <div class="right">
     <span id="status-count"></span>
     <a id="copyright" href="https://github.com/aresstack" target="_blank" rel="noopener">© 2026 AresStack</a>
@@ -553,6 +565,7 @@ const el = {
   btnEdit: document.getElementById("btn-edit"),
   btnSave: document.getElementById("btn-save"),
   btnTheme: document.getElementById("btn-theme"),
+  btnWidth: document.getElementById("btn-width"),
 };
 
 /* ---------- Anzeige ---------- */
@@ -1129,6 +1142,24 @@ el.btnTheme.addEventListener("click", () => {
   try { theme = localStorage.getItem("tiny-md-theme"); } catch (_) {}
   if (!theme) theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   document.documentElement.dataset.theme = theme;
+})();
+
+/* ---------- Breite: volle Fensterbreite oder Lesebreite ---------- */
+function applyWidth(width, remember) {
+  const full = width !== "narrow";
+  document.documentElement.dataset.width = full ? "full" : "narrow";
+  el.btnWidth.setAttribute("aria-pressed", String(full));
+  if (remember) {
+    try { localStorage.setItem("tiny-md-width", full ? "full" : "narrow"); } catch (_) {}
+  }
+}
+el.btnWidth.addEventListener("click", () => {
+  applyWidth(document.documentElement.dataset.width === "full" ? "narrow" : "full", true);
+});
+(function initWidth() {
+  let width = null;
+  try { width = localStorage.getItem("tiny-md-width"); } catch (_) {}
+  applyWidth(width || "full", false);
 })();
 
 /* ---------- Start ---------- */

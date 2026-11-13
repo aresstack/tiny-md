@@ -469,6 +469,21 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
       /draw\.io ist an Bord/.test(pd.innerHTML) && pd.querySelector(".drawio-diagram, code.language-drawio") !== null);
   }
 
+  {
+    // Breite: Standard volle Fensterbreite, Knopf schaltet auf Lesebreite und zurück
+    const ww = loadApp("tiny-md.html");
+    const root = ww.document.documentElement;
+    const bw = ww.document.getElementById("btn-width");
+    check("breite: Standard volle Breite", root.dataset.width === "full" && bw.getAttribute("aria-pressed") === "true");
+    bw.click();
+    check("breite: Knopf schaltet auf Lesebreite", root.dataset.width === "narrow" && bw.getAttribute("aria-pressed") === "false");
+    bw.click();
+    check("breite: zweiter Klick wieder volle Breite", root.dataset.width === "full");
+    check("breite: Lesebreite-Regel nur ohne volle Breite",
+      /html\[data-width="full"\] \.md-body,\s*html\[data-width="full"\] #folder-hint \{ max-width: none; \}/
+        .test(ww.document.querySelector("style").textContent));
+  }
+
   check("tiny-md-katex.html enthält KaTeX + Fonts", distSize("tiny-md-katex.html") > 500_000);
   check("tiny-md-full.html enthält Mermaid + KaTeX", distSize("tiny-md-full.html") > 4_000_000);
 
