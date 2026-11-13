@@ -263,7 +263,7 @@ body.dragging #drop-overlay { display: flex; }
 </footer>
 
 <div id="drop-overlay">Datei hier ablegen</div>
-<input type="file" id="file-input" accept=".md,.markdown,.mdown,.txt,.yaml,.yml,.json" hidden>
+<input type="file" id="file-input" accept=".md,.markdown,.mdown,.txt,.yaml,.yml,.json,.zip" hidden>
 
 <!-- Eingebettetes Dokument: wird vom Build-Skript befüllt. Leer = App startet ohne Dokument. -->
 <script type="text/markdown" id="embedded-md" data-filename="__EMBEDDED_FILENAME__">__EMBEDDED_MD__</script>
@@ -425,6 +425,9 @@ const state = {
   modified: false,
   fileHandle: null,   // File System Access API (Edge/Chrome), sonst null
   embedded: false,
+  // Dateien neben dem Dokument (aus ZIP oder abgelegtem Ordner): Pfad → () => Promise<Blob>
+  resources: null,
+  baseDir: "",        // Ordner des Dokuments innerhalb von ZIP/Ordner, z. B. "export/"
 };
 
 const el = {
@@ -453,7 +456,155 @@ function updatePreview() {
     a.target = "_blank";
     a.rel = "noopener noreferrer";
   });
+  resolveResources(el.preview);
   renderMermaidIn(el.preview);
+}
+
+/* ---------- Bilder und Dateien neben dem Dokument ----------
+   Der Browser löst relative Pfade gegen den Ort der tiny-md.html auf, nicht
+   gegen die geöffnete .md-Datei (deren Ordner kennt er nicht). Wurde ein ZIP
+   oder ein Ordner geöffnet, zeigen relative Bild- und Linkziele stattdessen
+   auf die Datei darin (als blob:-URL, ohne Netzwerk). */
+const blobUrls = new Map();   // Pfad → Promise<blob:-URL>
+
+function resourcePath(ref) {
+  if (!ref || /^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("#") || ref.startsWith("//")) return null;
+  const clean = ref.split("#")[0].split("?")[0];
+  let url;
+  try { url = new URL(clean, "http://paket.invalid/" + state.baseDir); } catch (_) { return null; }
+  try { return decodeURIComponent(url.pathname.slice(1)); } catch (_) { return url.pathname.slice(1); }
+}
+
+function resourceUrl(path) {
+  if (!blobUrls.has(path)) {
+    blobUrls.set(path, state.resources.get(path)().then(blob => URL.createObjectURL(blob)));
+  }
+  return blobUrls.get(path);
+}
+
+function resolveResources(container) {
+  if (!state.resources) return;
+  for (const [node, attr] of [...container.querySelectorAll("img[src]")].map(n => [n, "src"])
+    .concat([...container.querySelectorAll("a[href]")].map(n => [n, "href"]))) {
+    const path = resourcePath(node.getAttribute(attr));
+    if (path === null || !state.resources.has(path)) continue;
+    if (attr === "href") node.setAttribute("download", path.split("/").pop());
+    resourceUrl(path).then(url => node.setAttribute(attr, url), () => {});
+  }
+}
+
+function setResources(resources, baseDir) {
+  for (const url of blobUrls.values()) url.then(u => URL.revokeObjectURL(u), () => {});
+  blobUrls.clear();
+  state.resources = resources;
+  state.baseDir = baseDir || "";
+}
+
+const MIME = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+  svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon", pdf: "application/pdf",
+};
+function mimeOf(name) {
+  return MIME[(name.split(".").pop() || "").toLowerCase()] || "application/octet-stream";
+}
+
+const DOC_EXT = /\.(md|markdown|mdown)$/i;
+
+// Das Dokument eines Pakets: pages.md, sonst die flachste .md-Datei
+function pickDocument(paths) {
+  const docs = paths.filter(p => DOC_EXT.test(p))
+    .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
+  return docs.find(p => p.split("/").pop().toLowerCase() === "pages.md") || docs[0] || null;
+}
+
+/* Minimaler ZIP-Leser (gespeichert oder Deflate) über DecompressionStream –
+   ohne Zusatzbibliothek. Liefert Pfad → () => Promise<Blob>. */
+async function readZip(file) {
+  const tailSize = Math.min(file.size, 65557);
+  const tail = new DataView(await file.slice(file.size - tailSize).arrayBuffer());
+  let eocd = -1;
+  for (let i = tailSize - 22; i >= 0; i--) {
+    if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Keine ZIP-Datei");
+  const count = tail.getUint16(eocd + 10, true);
+  const dirSize = tail.getUint32(eocd + 12, true);
+  const dirOffset = tail.getUint32(eocd + 16, true);
+  const dir = new DataView(await file.slice(dirOffset, dirOffset + dirSize).arrayBuffer());
+  const utf8 = new TextDecoder("utf-8");
+  const entries = new Map();
+  let p = 0;
+  for (let n = 0; n < count && dir.getUint32(p, true) === 0x02014b50; n++) {
+    const method = dir.getUint16(p + 10, true);
+    const compressed = dir.getUint32(p + 20, true);
+    const nameLen = dir.getUint16(p + 28, true);
+    const extraLen = dir.getUint16(p + 30, true);
+    const commentLen = dir.getUint16(p + 32, true);
+    const local = dir.getUint32(p + 42, true);
+    const name = utf8.decode(new Uint8Array(dir.buffer, dir.byteOffset + p + 46, nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    if (name.endsWith("/") || name.split("/").includes("..")) continue;
+    entries.set(name, async () => {
+      const head = new DataView(await file.slice(local, local + 30).arrayBuffer());
+      const start = local + 30 + head.getUint16(26, true) + head.getUint16(28, true);
+      const raw = file.slice(start, start + compressed);
+      if (method === 0) return new Blob([raw], { type: mimeOf(name) });
+      if (method !== 8) throw new Error("ZIP-Verfahren " + method + " nicht unterstützt");
+      const stream = raw.stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Blob([await new Response(stream).arrayBuffer()], { type: mimeOf(name) });
+    });
+  }
+  return entries;
+}
+
+async function loadZip(file) {
+  let entries;
+  try { entries = await readZip(file); } catch (err) {
+    alert(file.name + " lässt sich nicht als ZIP lesen: " + err.message);
+    return;
+  }
+  const doc = pickDocument([...entries.keys()]);
+  if (!doc) { alert(file.name + " enthält keine Markdown-Datei."); return; }
+  const text = await (await entries.get(doc)()).text();
+  entries.delete(doc);
+  setResources(entries, doc.slice(0, doc.lastIndexOf("/") + 1));
+  setDocument(doc.split("/").pop(), text, { keepResources: true });
+}
+
+/* Abgelegter Ordner (Drag & Drop): alle Dateien darin samt Unterordnern */
+function readDirectory(dirEntry) {
+  const files = new Map();
+  const walk = (entry, prefix) => new Promise(resolve => {
+    if (entry.isFile) {
+      entry.file(f => { files.set(prefix + entry.name, f); resolve(); }, () => resolve());
+      return;
+    }
+    const reader = entry.createReader();
+    const all = [];
+    const next = () => reader.readEntries(batch => {
+      if (!batch.length) {
+        Promise.all(all.map(e => walk(e, prefix + entry.name + "/"))).then(resolve);
+        return;
+      }
+      all.push(...batch);
+      next();
+    }, () => resolve());
+    next();
+  });
+  return walk(dirEntry, "").then(() => files);
+}
+
+async function loadDirectory(dirEntry) {
+  const files = await readDirectory(dirEntry);
+  const doc = pickDocument([...files.keys()]);
+  if (!doc) { alert("Der Ordner " + dirEntry.name + " enthält keine Markdown-Datei."); return; }
+  const text = await files.get(doc).text();
+  const resources = new Map();
+  for (const [path, f] of files) {
+    if (path !== doc) resources.set(path, () => Promise.resolve(new Blob([f], { type: f.type || mimeOf(path) })));
+  }
+  setResources(resources, doc.slice(0, doc.lastIndexOf("/") + 1));
+  setDocument(doc.split("/").pop(), text, { keepResources: true });
 }
 
 function updateChrome() {
@@ -476,6 +627,7 @@ function setDocument(filename, content, opts) {
   state.content = content;
   state.modified = false;
   state.fileHandle = (opts && opts.fileHandle) || null;
+  if (!(opts && opts.keepResources)) setResources(null, "");
   el.editor.value = content;
   updatePreview();
   updateChrome();
@@ -525,6 +677,7 @@ el.fileInput.addEventListener("change", async () => {
 
 async function loadFile(file, fileHandle) {
   if (state.modified && !confirm("Ungespeicherte Änderungen verwerfen?")) return;
+  if (/\.zip$/i.test(file.name)) { await loadZip(file); return; }
   const text = await file.text();
   setDocument(file.name, text, { fileHandle: fileHandle || null });
 }
@@ -548,6 +701,13 @@ document.addEventListener("drop", async e => {
   const file = e.dataTransfer.files[0];
   if (!file) return;
   const item = e.dataTransfer.items && e.dataTransfer.items[0];
+  // Ein abgelegter Ordner (z. B. das entpackte Markdown-Paket): Dokument samt Bildern
+  const entry = item && item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+  if (entry && entry.isDirectory) {
+    if (state.modified && !confirm("Ungespeicherte Änderungen verwerfen?")) return;
+    await loadDirectory(entry);
+    return;
+  }
   const handlePromise = item && item.getAsFileSystemHandle ? item.getAsFileSystemHandle() : null;
   // Wenn möglich, den FileSystemHandle mitnehmen → direktes Zurückspeichern
   let handle = null;

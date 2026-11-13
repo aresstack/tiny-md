@@ -28,6 +28,7 @@ Datei herunterladen, doppelklicken, fertig.
 
 - **Lesen:** eingebettetes Markdown wird beim Öffnen sofort sauber gerendert (GFM: Tabellen, Task-Listen, Codeblöcke), hell/dunkel, druckbar
 - **Öffnen:** `.md`-Datei per Button (Strg+O) oder Drag & Drop
+- **Markdown mit Bilderordner** (z. B. das Markdown-Paket von Space Harvester): das **ZIP direkt öffnen** (Button oder Drag & Drop) oder den **entpackten Ordner** ins Fenster ziehen. tiny-md nimmt `pages.md` (sonst die oberste `.md`-Datei) und zeigt relative Bilder (`assets/…png`) und verlinkte Dateien (`attachments/…`) aus dem ZIP bzw. Ordner an – ohne Entpacken, ohne Netzwerk. Eine einzeln geöffnete `.md`-Datei kann das nicht: der Browser verrät den Ordner der Datei nicht, relative Pfade gelten dann relativ zur `tiny-md.html`
 - **Bearbeiten:** Split-Ansicht Editor/Vorschau (Strg+E), Live-Rendering
 - **Speichern** (Strg+S):
   - Edge/Chrome: direkt zurück in die Originaldatei (File System Access API)
@@ -42,7 +43,7 @@ Datei herunterladen, doppelklicken, fertig.
   - inline: `<svg …>…</svg>` einfach ins Markdown schreiben (DOMPurify lässt SVG durch, entfernt aber Skripte und Event-Handler)
   - als Bild mit Data-URI: `![Alt-Text](data:image/svg+xml;base64,…)`
 
-  Beides bleibt selbst-enthalten in der einen HTML-Datei. Klassische relative Bildpfade (`![x](bild.svg)`, auch PNG/JPG) funktionieren nur, solange die Bilddatei neben der HTML liegt – für den E-Mail-Anhang-Fall also Inline-SVG oder Data-URIs verwenden. Bekannte Einschränkung: `<style>`-Blöcke *innerhalb* von Inline-SVGs verträgt das Autolinking nicht zuverlässig – Farben dort besser direkt als Attribute setzen (`fill="…"`).
+  Beides bleibt selbst-enthalten in der einen HTML-Datei. Klassische relative Bildpfade (`![x](bild.svg)`, auch PNG/JPG) funktionieren bei einer einzeln geöffneten `.md` nur, solange die Bilddatei neben der HTML liegt (ZIP oder Ordner öffnen hilft, siehe oben) – für den E-Mail-Anhang-Fall also Inline-SVG oder Data-URIs verwenden. Bekannte Einschränkung: `<style>`-Blöcke *innerhalb* von Inline-SVGs verträgt das Autolinking nicht zuverlässig – Farben dort besser direkt als Attribute setzen (`fill="…"`).
 - **Kein „nach Hause telefonieren":** automatisch ladende Fernressourcen werden beim Rendern entfernt – Bilder/Video/Audio mit `http(s)`-URLs, `url()` und `@import` in Styles. Ein fremdes Dokument kann beim Öffnen also keine Lesebestätigung per Tracking-Pixel auslösen. Data-URIs und relative Pfade bleiben erlaubt, normale Links bleiben klickbar (öffnen in neuem Tab).
 
 ## Selbst bauen
