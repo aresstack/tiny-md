@@ -254,6 +254,36 @@ check("tiny-md-mermaid.html enthält Mermaid", distSize("tiny-md-mermaid.html") 
     await new Promise(r => setTimeout(r, 200));
     check("einzeln: relative Pfade bleiben, wie sie sind",
       wo.document.querySelector('#preview img[alt="Bild"]').getAttribute("src") === "assets/a%20b.png");
+
+    // Viewer mit eingebettetem Dokument: danach geöffnete .md bekommt den Hinweis trotzdem
+    const we = withBlobs(loadApp("beispiel.html"));
+    drop(we, new we.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    check("eingebettet: Hinweis Ordner freigeben für später geöffnete .md",
+      we.document.getElementById("folder-hint").classList.contains("visible"));
+
+    // Ordner wird noch gelesen, inzwischen ein anderes Dokument geöffnet → Ergebnis verwerfen
+    const ws2 = withBlobs(loadApp("tiny-md.html"));
+    drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    let release;
+    const gate = new Promise(r => { release = r; });
+    ws2.showDirectoryPicker = async () => ({ async *entries() {
+      await gate;
+      yield ["pages.md", { kind: "file", getFile: async () => new ws2.File([md], "pages.md") }];
+      yield ["assets", { kind: "directory", async *entries() {
+        yield ["a b.png", { kind: "file", getFile: async () => new ws2.File(["PNG"], "a b.png") }];
+      } }];
+    } });
+    ws2.document.getElementById("btn-folder").click();
+    await new Promise(r => setTimeout(r, 50));
+    drop(ws2, new ws2.File([md], "pages.md"), { kind: "file" });
+    await new Promise(r => setTimeout(r, 200));
+    release();
+    await new Promise(r => setTimeout(r, 200));
+    check("einzeln: später fertiger Ordner gilt nicht für das neue Dokument",
+      ws2.document.querySelector('#preview img[alt="Bild"]').getAttribute("src") === "assets/a%20b.png"
+      && ws2.document.getElementById("folder-hint").classList.contains("visible"));
   }
 
   /* ---------- Mathe: Roundtrip über den Editor-Eingabepfad ---------- */

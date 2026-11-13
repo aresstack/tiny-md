@@ -533,6 +533,7 @@ const state = {
   modified: false,
   fileHandle: null,   // File System Access API (Edge/Chrome), sonst null
   embedded: false,
+  docSerial: 0, // zählt geöffnete Dokumente; späte Ordnerergebnisse eines Vorgängers werden verworfen
   // Dateien neben dem Dokument (aus ZIP oder abgelegtem Ordner): Pfad → () => Promise<Blob>
   resources: null,
   baseDir: "",        // Ordner des Dokuments innerhalb von ZIP/Ordner, z. B. "export/"
@@ -642,7 +643,8 @@ function baseDirFor(paths) {
   return own ? own.slice(0, own.lastIndexOf("/") + 1) : "";
 }
 
-function useFolder(files) {
+function useFolder(files, serial) {
+  if (serial !== undefined && serial !== state.docSerial) return; // inzwischen anderes Dokument geöffnet
   const resources = new Map();
   for (const [path, open] of files) {
     resources.set(path, () => Promise.resolve(open()).then(f => new Blob([f], { type: f.type || mimeOf(path) })));
@@ -652,6 +654,7 @@ function useFolder(files) {
 }
 
 async function shareFolder() {
+  const serial = state.docSerial;
   if (window.showDirectoryPicker) {
     let dir;
     try {
@@ -660,12 +663,14 @@ async function shareFolder() {
       if (err && err.name === "AbortError") return;
       try { dir = await showDirectoryPicker(); } catch (_) { return; }
     }
-    useFolder(await readDirectoryHandle(dir, "", new Map()));
+    useFolder(await readDirectoryHandle(dir, "", new Map()), serial);
     return;
   }
+  folderSerial = serial;
   document.getElementById("folder-input").click(); // Firefox: Ordnerauswahl über <input webkitdirectory>
 }
 
+let folderSerial;
 document.getElementById("btn-folder").addEventListener("click", shareFolder);
 document.getElementById("folder-input").addEventListener("change", e => {
   const files = new Map();
@@ -675,7 +680,7 @@ document.getElementById("folder-input").addEventListener("change", e => {
     files.set(rel, () => f);
   }
   e.target.value = "";
-  if (files.size) useFolder(files);
+  if (files.size) useFolder(files, folderSerial);
 });
 
 function setResources(resources, baseDir) {
@@ -827,6 +832,8 @@ function setDocument(filename, content, opts) {
   state.content = content;
   state.modified = false;
   state.fileHandle = (opts && opts.fileHandle) || null;
+  state.embedded = !!(opts && opts.embedded);
+  state.docSerial++;
   if (!(opts && opts.keepResources)) setResources(null, "");
   el.editor.value = content;
   updatePreview();
@@ -1008,8 +1015,7 @@ el.btnTheme.addEventListener("click", () => {
   const embeddedName = embed.dataset.filename;
 
   if (embeddedText && embeddedName !== "__EMBEDDED" + "_FILENAME__") {
-    state.embedded = true;
-    setDocument(embeddedName || "dokument.md", embeddedText);
+    setDocument(embeddedName || "dokument.md", embeddedText, { embedded: true });
     setMode("read");
   } else {
     setDocument("dokument.md", [
